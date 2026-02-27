@@ -29,8 +29,6 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
     networks:
       - xhs-network
     healthcheck:
@@ -65,8 +63,8 @@ services:
   # Node.js服务器
   xhs-server:
     build:
-      context: ./packages/server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: packages/server/Dockerfile
     container_name: xhs-server
     environment:
       NODE_ENV: production
@@ -79,15 +77,18 @@ services:
       REDIS_URL: redis://redis:6379
       MQTT_URL: mqtt://emqx:1883
       JWT_SECRET: ${JWT_SECRET:-your-secret-key}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      SESSION_SECRET: ${SESSION_SECRET}
     ports:
-      - "3000:3000"
+      - "3002:3000"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
       emqx:
-        condition: service_healthy
+        condition: service_started
     networks:
       - xhs-network
     restart: unless-stopped

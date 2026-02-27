@@ -9,12 +9,14 @@ WORKDIR /app
 COPY package*.json ./
 COPY packages/server/package*.json ./packages/server/
 
-# 安装依赖
-RUN npm install --workspace=packages/server --production
+# 配置npm使用国内镜像源并安装依赖
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install --workspace=packages/server --production
 
 # 复制源代码
 COPY packages/server ./packages/server
 COPY src ./src
+COPY public ./public
 
 # 创建必要的目录
 RUN mkdir -p /app/data /app/logs /app/keys
