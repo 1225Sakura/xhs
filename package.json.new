@@ -1,0 +1,31 @@
+{
+  "name": "xhs-publisher-monorepo",
+  "version": "2.0.0",
+  "private": true,
+  "description": "小红书发布系统 - 商业化版本（本地部署+云端监控）",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:client": "npm run dev --workspace=packages/client",
+    "dev:server": "npm run dev --workspace=packages/server",
+    "dev:dashboard": "npm run dev --workspace=packages/dashboard",
+    "build:client": "npm run build --workspace=packages/client",
+    "build:server": "npm run build --workspace=packages/server",
+    "build:dashboard": "npm run build --workspace=packages/dashboard",
+    "build:all": "npm run build:client && npm run build:server && npm run build:dashboard",
+    "start:server": "npm run start --workspace=packages/server",
+    "lint": "eslint packages/*/src --ext .js,.ts,.tsx",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "typescript": "^5.2.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  }
+}

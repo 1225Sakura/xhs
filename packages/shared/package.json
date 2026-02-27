@@ -1,0 +1,13 @@
+{
+  "name": "@xhs-publisher/shared",
+  "version": "2.0.0",
+  "description": "共享代码和类型定义",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.0"
+  }
+}
