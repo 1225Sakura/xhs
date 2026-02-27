@@ -1,0 +1,60 @@
+# Dependencies
+node_modules
+npm-debug.log
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+QUICKSTART.md
+*.md
+
+# Data files
+data/*.db
+data/*.db-journal
+uploads/*
+!uploads/.gitkeep
+backups/*
+!backups/.gitkeep
+knowledge/*
+!knowledge/.gitkeep
+ssl/*.key
+ssl/*.crt
+ssl/*.pem
+
+# External dependencies (xiaohongshu-mcp source, not needed in image)
+external/
+
+# IDE
+.vscode
+.idea
+.DS_Store
+*.swp
+*.swo
+
+# Logs
+*.log
+logs
+
+# Testing
+test
+tests
+*.test.js
+*.spec.js
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore

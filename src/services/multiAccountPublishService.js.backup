@@ -1,0 +1,383 @@
+/**
+ * 多账户小红书发布服务
+ * 使用 Playwright 直接控制浏览器发布
+ */
+
+import { chromium } from 'playwright';
+import accountManagementService from './accountManagementService.js';
+import path from 'path';
+import fs from 'fs';
+import fsp from 'fs/promises';
+
+class MultiAccountPublishService {
+  /**
+   * 发布笔记到小红书
+   */
+  async publishNote(title, content, images = [], accountId = null) {
+    let browser = null;
+
+    try {
+      // 如果没有指定账户，使用当前活跃账户
+      if (!accountId) {
+        const activeAccount = accountManagementService.getActiveAccount();
+        if (!activeAccount) {
+          return {
+            success: false,
+            error: '请先创建或选择一个账户'
+          };
+        }
+        accountId = activeAccount.id;
+      }
+
+      // 获取账户信息
+      const account = accountManagementService.getAccountById(accountId);
+      if (!account) {
+        return {
+          success: false,
+          error: '账户不存在'
+        };
+      }
+
+      if (!account.is_logged_in) {
+        return {
+          success: false,
+          error: '账户未登录，请先登录'
+        };
+      }
+
+      // 验证 cookies 是否有效（检查过期时间）
+      const cookies = accountManagementService.getAccountCookies(accountId);
+      if (!cookies) {
+        // 更新登录状态为未登录
+        accountManagementService.updateLoginStatus(accountId, false, null);
+        return {
+          success: false,
+          error: '账户 cookies 无效，请重新登录'
+        };
+      }
+
+      // 检查 cookies 是否过期
+      const now = Date.now() / 1000;
+      const expiredCookies = cookies.filter(cookie => {
+        if (cookie.expires && cookie.expires > 0) {
+          return cookie.expires < now;
+        }
+        return false;
+      });
+
+      if (expiredCookies.length > 0) {
+        console.log(`⚠️ 发现 ${expiredCookies.length} 个过期的 cookies`);
+        // 更新登录状态为未登录
+        accountManagementService.updateLoginStatus(accountId, false, null);
+        return {
+          success: false,
+          error: '登录已过期，请重新登录'
+        };
+      }
+
+      console.log(`🚀 开始为账户 ${account.account_name} (ID: ${accountId}) 发布笔记...`);
+      console.log('📝 标题:', title);
+      console.log('📝 内容长度:', content.length);
+      console.log('🖼️ 图片数量:', images.length);
+
+      // 启动浏览器
+      browser = await chromium.launch({
+        headless: false,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-blink-features=AutomationControlled',
+          '--disable-dev-shm-usage',
+        ],
+      });
+
+      const context = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        viewport: { width: 1920, height: 1080 },
+        locale: 'zh-CN',
+      });
+
+      // 隐藏 webdriver 特征
+      await context.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', {
+          get: () => undefined,
+        });
+      });
+
+      // 加载账户的 cookies（已在前面验证过有效性）
+      console.log('🍪 加载账户 cookies...');
+      await context.addCookies(cookies);
+
+      const page = await context.newPage();
+
+      // 访问创作者中心首页（不是直接访问发布页面）
+      console.log('📄 访问创作者中心...');
+      await page.goto('https://creator.xiaohongshu.com', {
+        waitUntil: 'networkidle',
+        timeout: 60000
+      });
+
+      // 等待页面加载
+      await page.waitForTimeout(3000);
+
+      // 检查是否需要登录
+      let currentUrl = page.url();
+      if (currentUrl.includes('login')) {
+        await browser.close();
+        return {
+          success: false,
+          error: '登录已过期，请重新登录'
+        };
+      }
+
+      // 点击"发布笔记"按钮打开发布弹窗
+      console.log('📝 点击发布笔记按钮...');
+      const publishSelectors = [
+        '.publish-video .btn',
+        'button:has-text("发布笔记")',
+        '.btn:has-text("发布笔记")',
+        'text=发布笔记'
+      ];
+
+      let publishClicked = false;
+      for (const selector of publishSelectors) {
+        try {
+          console.log(`尝试发布按钮选择器: ${selector}`);
+          await page.waitForSelector(selector, { timeout: 5000 });
+          await page.click(selector);
+          console.log(`✅ 成功点击发布按钮: ${selector}`);
+          publishClicked = true;
+          break;
+        } catch (e) {
+          console.log(`发布按钮选择器 ${selector} 失败`);
+        }
+      }
+
+      if (!publishClicked) {
+        const screenshotPath = path.join(process.cwd(), 'data', 'temp', `no-publish-button-${Date.now()}.png`);
+        await fsp.mkdir(path.dirname(screenshotPath), { recursive: true });
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+        console.log('📸 未找到发布按钮，已保存截图:', screenshotPath);
+
+        await browser.close();
+        return {
+          success: false,
+          error: '未找到发布按钮'
+        };
+      }
+
+      await page.waitForTimeout(3000);
+
+      // 切换到图文tab（第二个tab）
+      console.log('🔄 切换到图文发布模式...');
+      try {
+        // 等待tab加载
+        await page.waitForSelector('.creator-tab', { timeout: 10000 });
+
+        // 使用JavaScript点击第二个tab
+        const tabClicked = await page.evaluate(() => {
+          const tabs = document.querySelectorAll('.creator-tab');
+          if (tabs.length > 1) {
+            tabs[1].click();
+            return true;
+          }
+          return false;
+        });
+
+        if (tabClicked) {
+          console.log('✅ 已切换到图文tab');
+          await page.waitForTimeout(2000);
+        } else {
+          console.warn('⚠️ 未找到图文tab');
+        }
+      } catch (error) {
+        console.warn('⚠️ 切换图文tab时出错:', error.message);
+      }
+
+      // 等待页面切换完成
+      await page.waitForTimeout(3000);
+
+      // 上传图片
+      if (images && images.length > 0) {
+        console.log(`📷 上传 ${images.length} 张图片...`);
+        let inputUpload = await page.$('input[type="file"]');
+        if (inputUpload) {
+          // 将图片路径转换为绝对路径
+          const absoluteImages = images.map(img => {
+            // 如果已经是绝对路径（Windows: C:\... 或 Linux: /home/...）
+            if (path.isAbsolute(img) && !img.startsWith('/app/') && !img.startsWith('/uploads/')) {
+              return img;
+            }
+
+            // 处理 MCP 容器路径 /app/uploads/...
+            if (img.startsWith('/app/uploads/')) {
+              return path.join(process.cwd(), img.replace('/app/', ''));
+            }
+
+            // 处理相对路径 /uploads/...
+            if (img.startsWith('/uploads/')) {
+              return path.join(process.cwd(), img.substring(1)); // 移除开头的 /
+            }
+
+            // 处理相对路径 uploads/...
+            if (img.startsWith('uploads/')) {
+              return path.join(process.cwd(), img);
+            }
+
+            // 其他情况，假设是相对于项目根目录
+            return path.join(process.cwd(), img);
+          });
+
+          console.log('📂 转换后的图片路径:', absoluteImages);
+
+          // 检查文件是否存在
+          for (const imgPath of absoluteImages) {
+            if (!fs.existsSync(imgPath)) {
+              console.error(`❌ 图片文件不存在: ${imgPath}`);
+              await browser.close();
+              return {
+                success: false,
+                error: `图片文件不存在: ${imgPath}`
+              };
+            }
+          }
+
+          // 检查 input 是否支持多文件上传
+          const hasMultiple = await inputUpload.evaluate(el => el.hasAttribute('multiple'));
+
+          if (hasMultiple || absoluteImages.length === 1) {
+            // 支持多文件上传，或只有一个文件
+            await inputUpload.setInputFiles(absoluteImages);
+            console.log('✅ 图片上传完成');
+          } else {
+            // 不支持多文件上传，需要逐个上传
+            console.log('⚠️ 检测到单文件上传控件，尝试逐个上传...');
+            for (let i = 0; i < absoluteImages.length; i++) {
+              console.log(`📤 上传第 ${i + 1}/${absoluteImages.length} 张图片...`);
+              await inputUpload.setInputFiles([absoluteImages[i]]);
+              await page.waitForTimeout(1000);
+
+              // 如果还有更多图片，需要再次找到 input 元素（可能已经被替换）
+              if (i < absoluteImages.length - 1) {
+                const nextInput = await page.$('input[type="file"]');
+                if (nextInput) {
+                  inputUpload = nextInput;
+                } else {
+                  console.warn('⚠️ 无法找到下一个文件上传控件');
+                  break;
+                }
+              }
+            }
+            console.log('✅ 所有图片上传完成');
+          }
+
+          // 等待图片处理
+          await page.waitForTimeout(3000);
+        }
+      }
+
+      // 填写标题
+      console.log('✍️ 填写标题...');
+      const titleInput = await page.$('input[placeholder*="填写标题"], input[placeholder*="标题"]');
+      if (titleInput) {
+        await titleInput.fill(title);
+      }
+
+      // 填写内容
+      console.log('✍️ 填写内容...');
+      const contentArea = await page.$('div[contenteditable="true"]');
+      if (contentArea) {
+        await titleInput.fill(content);
+      }
+
+      // 等待一下确保内容填写完成
+      await page.waitForTimeout(2000);
+
+      // 点击发布按钮
+      console.log('📤 点击发布...');
+
+      // 尝试多种方式查找发布按钮
+      let publishButton = await page.$('button:has-text("发布")');
+      if (!publishButton) {
+        publishButton = await page.$('button[type="submit"]');
+      }
+      if (!publishButton) {
+        publishButton = await page.$('.publish-btn, .submit-btn, [class*="publish"], [class*="submit"]');
+      }
+
+      if (publishButton) {
+        await publishButton.click();
+        console.log('✅ 已点击发布按钮');
+      } else {
+        // 截图以便调试
+        const screenshotPath = path.join(process.cwd(), 'data', 'temp', `no-button-${Date.now()}.png`);
+        await fsp.mkdir(path.dirname(screenshotPath), { recursive: true });
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+        console.log('📸 未找到发布按钮，已保存截图:', screenshotPath);
+
+        await browser.close();
+        return {
+          success: false,
+          error: '未找到发布按钮'
+        };
+      }
+
+      // 等待发布完成 - 检查成功标识
+      console.log('⏳ 等待发布完成...');
+      try {
+        // 等待成功提示或页面跳转（最多等待30秒）
+        await Promise.race([
+          page.waitForSelector('text=发布成功', { timeout: 30000 }),
+          page.waitForSelector('.success', { timeout: 30000 }),
+          page.waitForURL(/.*\/publish\/success.*/, { timeout: 30000 })
+        ]);
+
+        console.log('✅ 发布成功！');
+        await browser.close();
+        return {
+          success: true,
+          data: {
+            message: '发布成功',
+            account_id: accountId,
+            account_name: account.account_name
+          }
+        };
+      } catch (waitError) {
+        // 如果没有找到成功标识，检查是否有错误提示
+        const errorElement = await page.$('.error, .error-message, [class*="error"]');
+        if (errorElement) {
+          const errorText = await errorElement.textContent();
+          await browser.close();
+          return {
+            success: false,
+            error: `发布失败: ${errorText}`
+          };
+        }
+
+        // 截图保存以便调试
+        const screenshotPath = path.join(process.cwd(), 'data', 'temp', `publish-error-${Date.now()}.png`);
+        await fsp.mkdir(path.dirname(screenshotPath), { recursive: true });
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+        console.log('📸 已保存截图:', screenshotPath);
+
+        await browser.close();
+        return {
+          success: false,
+          error: '发布超时或未检测到成功标识，请检查截图'
+        };
+      }
+
+    } catch (error) {
+      console.error('❌ 发布失败:', error);
+      if (browser) {
+        await browser.close();
+      }
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+}
+
+export default new MultiAccountPublishService();

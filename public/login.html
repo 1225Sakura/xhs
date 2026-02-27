@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小红书登录 - 扫码登录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 450px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .qrcode-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #qrcode {
+            max-width: 250px;
+            width: 100%;
+            height: auto;
+            border-radius: 10px;
+        }
+
+        .loading {
+            color: #667eea;
+            font-size: 16px;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>小红书登录</h1>
+        <p class="subtitle">使用小红书 APP 扫描二维码登录</p>
+
+        <div class="qrcode-container">
+            <div class="loading" id="loading">正在加载二维码...</div>
+            <img id="qrcode" style="display: none;" alt="登录二维码">
+        </div>
+
+        <div id="status"></div>
+
+        <button class="btn" id="refreshBtn" onclick="loadQRCode()">刷新二维码</button>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+        let checkInterval = null;
+
+        // 从 URL 参数获取账户 ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const accountId = urlParams.get('account_id');
+
+        async function loadQRCode(forceNew = false) {
+            const loading = document.getElementById('loading');
+            const qrcode = document.getElementById('qrcode');
+            const status = document.getElementById('status');
+            const refreshBtn = document.getElementById('refreshBtn');
+
+            loading.style.display = 'block';
+            qrcode.style.display = 'none';
+            status.innerHTML = '';
+            refreshBtn.disabled = true;
+
+            // 停止之前的检查
+            if (checkInterval) {
+                clearInterval(checkInterval);
+            }
+
+            try {
+                // 构建 URL，添加 force_new 参数
+                let url = `${API_URL}/xhs/login/qrcode`;
+                const params = new URLSearchParams();
+
+                if (accountId) {
+                    params.append('account_id', accountId);
+                }
+                if (forceNew) {
+                    params.append('force_new', 'true');
+                }
+
+                if (params.toString()) {
+                    url += '?' + params.toString();
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success && data.data.manual_login) {
+                    // 手动登录模式
+                    loading.style.display = 'none';
+                    status.className = 'status info';
+                    status.innerHTML = '✅ ' + (data.data.message || '请在浏览器中手动完成登录');
+                    refreshBtn.disabled = false;
+
+                    // 开始检查登录状态
+                    startCheckingLoginStatus();
+                } else if (data.success && data.data.qrcode) {
+                    loading.style.display = 'none';
+                    qrcode.src = data.data.qrcode;
+                    qrcode.style.display = 'block';
+                    refreshBtn.disabled = false;
+
+                    // 开始检查登录状态
+                    startCheckingLoginStatus();
+                } else if (data.success && data.data.is_logged_in) {
+                    // 已经登录了
+                    loading.style.display = 'none';
+                    status.className = 'status success';
+                    status.innerHTML = '✅ 检测到已登录状态！<br><button class="btn" onclick="loadQRCode(true)" style="margin-top: 10px;">重新登录</button>';
+                    refreshBtn.disabled = false;
+                } else {
+                    throw new Error(data.error || '获取二维码失败');
+                }
+            } catch (error) {
+                loading.style.display = 'none';
+                status.className = 'status error';
+                status.innerHTML = `获取二维码失败: ${error.message}`;
+                refreshBtn.disabled = false;
+            }
+        }
+
+        function startCheckingLoginStatus() {
+            const status = document.getElementById('status');
+            status.className = 'status info';
+            status.innerHTML = '请使用小红书 APP 扫描二维码...';
+
+            checkInterval = setInterval(async () => {
+                try {
+                    // 如果有账户 ID，添加到请求参数中
+                    const url = accountId
+                        ? `${API_URL}/xhs/login-status?account_id=${accountId}`
+                        : `${API_URL}/xhs/login-status`;
+
+                    const response = await fetch(url);
+                    const data = await response.json();
+
+                    if (data.success && data.data.logged_in) {
+                        clearInterval(checkInterval);
+                        status.className = 'status success';
+                        status.innerHTML = '✅ 登录成功！Cookie 已保存，可以关闭此页面。';
+                        document.getElementById('qrcode').style.opacity = '0.5';
+                        document.getElementById('refreshBtn').disabled = true;
+                    }
+                } catch (error) {
+                    console.error('检查登录状态失败:', error);
+                }
+            }, 3000); // 每3秒检查一次
+        }
+
+        // 页面加载时自动获取二维码
+        window.onload = loadQRCode;
+
+        // 页面关闭时停止检查
+        window.onbeforeunload = () => {
+            if (checkInterval) {
+                clearInterval(checkInterval);
+            }
+        };
+    </script>
+</body>
+</html>

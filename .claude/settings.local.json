@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm start)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(sqlite3:*)",
+      "Bash(node:*)",
+      "Bash(ls:*)",
+      "Bash(test:*)",
+      "Bash(timeout:*)"
+    ]
+  }
+}

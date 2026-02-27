@@ -1,0 +1,106 @@
+services:
+  # 小红书MCP服务
+  xiaohongshu-mcp:
+    image: xpzouying/xiaohongshu-mcp:latest
+    container_name: xhs-mcp-server
+    ports:
+      - "8080:18060"  # 容器内部是18060端口
+    volumes:
+      # 持久化cookies和数据
+      - ./external/xiaohongshu-mcp/data:/app/data
+      # 配置文件
+      - ./external/xiaohongshu-mcp/configs:/app/configs
+      # 图片目录
+      - ./external/xiaohongshu-mcp/images:/app/images
+      # 共享上传目录（重要！MCP需要访问上传的图片）
+      - ./uploads:/app/uploads
+      # 知识库目录（MCP需要访问产品图片）
+      - ${KNOWLEDGE_BASE_PATH:-./knowledge/AI数据文档}:/knowledge:ro
+    environment:
+      - TZ=Asia/Shanghai
+      - COOKIES_PATH=/app/data/cookies.json
+      # Rod浏览器配置 - 使用headless模式（容器内无显示服务器）
+      - ROD_HEADLESS=true
+      # 代理配置已禁用（如果需要代理，请取消注释并配置正确的代理地址）
+      # - HTTP_PROXY=http://10.250.8.8:10809
+      # - HTTPS_PROXY=http://10.250.8.8:10809
+    restart: unless-stopped
+    networks:
+      - xhs-network
+
+  # Node.js 知识库发布系统
+  xhs-publisher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: xhs-publisher-app
+    depends_on:
+      - xiaohongshu-mcp
+    ports:
+      - "3000:3000"
+    volumes:
+      # 数据持久化
+      - ./data:/app/data
+      # 上传文件
+      - ./uploads:/app/uploads
+      # 知识库（默认使用项目内置，也可在.env中修改为外部路径）
+      - ${KNOWLEDGE_BASE_PATH:-./knowledge/AI数据文档}:/knowledge:ro
+      # 前端静态文件（开发时可实时更新）
+      - ./public:/app/public
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TZ=Asia/Shanghai
+      # 容器内的知识库路径
+      - KNOWLEDGE_BASE_PATH=/knowledge
+      # xiaohongshu-mcp服务地址（容器内部端口是18060）
+      - XIAOHONGSHU_MCP_URL=http://xiaohongshu-mcp:18060
+      # Claude API配置
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-${ANTHROPIC_AUTH_TOKEN}}
+      # 注意：此项目使用 api.aiyunos.top，不使用系统环境变量
+      - ANTHROPIC_BASE_URL=https://api.aiyunos.top
+      # 如果需要代理，取消下面两行的注释并配置
+      - HTTP_PROXY=http://10.250.8.8:10809
+      - HTTPS_PROXY=http://10.250.8.8:10809
+      # 排除内部Docker服务使用代理
+      - NO_PROXY=xiaohongshu-mcp,localhost,127.0.0.1,172.17.0.0/16,.local
+    restart: unless-stopped
+    networks:
+      - xhs-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # 数据库备份服务
+  db-backup:
+    image: alpine:latest
+    container_name: xhs-db-backup
+    volumes:
+      - ./data:/data:ro
+      - ./backups:/backups
+    command: >
+      sh -c "while true; do
+        if [ -f /data/knowledge.db ]; then
+          cp /data/knowledge.db /backups/knowledge-$$(date +%Y%m%d-%H%M%S).db;
+          find /backups -name 'knowledge-*.db' -mtime +7 -delete;
+          echo \"[$$( date '+%Y-%m-%d %H:%M:%S')] Database backup completed\";
+        fi;
+        sleep 86400;
+      done"
+    restart: unless-stopped
+    networks:
+      - xhs-network
+
+networks:
+  xhs-network:
+    driver: bridge
+    name: xhs-network
+
+volumes:
+  xhs-data:
+    driver: local
+  xhs-uploads:
+    driver: local
