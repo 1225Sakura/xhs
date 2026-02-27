@@ -1,0 +1,209 @@
+version: '3.8'
+
+services:
+  # PostgreSQL数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: xhs-postgres
+    environment:
+      POSTGRES_DB: xhs_cloud
+      POSTGRES_USER: xhs_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./packages/server/src/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - xhs-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xhs_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: xhs-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - xhs-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # EMQX MQTT Broker
+  emqx:
+    image: emqx/emqx:5.3.0
+    container_name: xhs-emqx
+    environment:
+      - EMQX_NAME=xhs-emqx
+      - EMQX_HOST=emqx
+    ports:
+      - "1883:1883"      # MQTT
+      - "8083:8083"      # WebSocket
+      - "8084:8084"      # WSS
+      - "18083:18083"    # Dashboard
+    volumes:
+      - emqx_data:/opt/emqx/data
+      - emqx_log:/opt/emqx/log
+    networks:
+      - xhs-network
+    healthcheck:
+      test: ["CMD", "emqx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node.js服务器
+  xhs-server:
+    build:
+      context: ./packages/server
+      dockerfile: Dockerfile
+    container_name: xhs-server
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: xhs_cloud
+      PG_USER: xhs_user
+      PG_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      REDIS_URL: redis://redis:6379
+      MQTT_URL: mqtt://emqx:1883
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      emqx:
+        condition: service_healthy
+    networks:
+      - xhs-network
+    restart: unless-stopped
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: xhs-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./packages/server/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./packages/server/prometheus/alerts.yml:/etc/prometheus/alerts.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - xhs-network
+    depends_on:
+      - xhs-server
+    restart: unless-stopped
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: xhs-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./packages/server/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    ports:
+      - "3001:3000"
+    networks:
+      - xhs-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # AlertManager
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: xhs-alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - ./packages/server/prometheus/alertmanager.yml:/etc/alertmanager/config.yml
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - xhs-network
+    restart: unless-stopped
+
+  # Node Exporter（系统指标）
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: xhs-node-exporter
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - "9100:9100"
+    networks:
+      - xhs-network
+    restart: unless-stopped
+
+  # PostgreSQL Exporter
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: xhs-postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://xhs_user:${POSTGRES_PASSWORD:-changeme}@postgres:5432/xhs_cloud?sslmode=disable"
+    ports:
+      - "9187:9187"
+    networks:
+      - xhs-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  # Redis Exporter
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: xhs-redis-exporter
+    environment:
+      REDIS_ADDR: redis:6379
+    ports:
+      - "9121:9121"
+    networks:
+      - xhs-network
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+networks:
+  xhs-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  emqx_data:
+  emqx_log:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:

@@ -1,0 +1,183 @@
+{
+  "dashboard": {
+    "title": "小红书发布系统 - 业务指标",
+    "tags": ["xhs", "business", "metrics"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "1m",
+    "panels": [
+      {
+        "id": 1,
+        "title": "AI请求总数",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(xhs_ai_requests_total)",
+            "legendFormat": "AI请求"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "文章创建总数",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(xhs_posts_created_total)",
+            "legendFormat": "创建文章"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "文章发布总数",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(xhs_posts_published_total)",
+            "legendFormat": "发布文章"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 4,
+        "title": "活跃许可证数",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(xhs_licenses_total{status=\"active\"})",
+            "legendFormat": "活跃许可证"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        }
+      },
+      {
+        "id": 5,
+        "title": "AI请求速率（按客户端）",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(xhs_ai_requests_total[5m])",
+            "legendFormat": "{{client_id}} - {{provider}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 4
+        }
+      },
+      {
+        "id": 6,
+        "title": "文章创建速率（按客户端）",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(xhs_posts_created_total[5m])",
+            "legendFormat": "{{client_id}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 4
+        }
+      },
+      {
+        "id": 7,
+        "title": "文章发布状态分布",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (status) (xhs_posts_published_total)",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 12
+        }
+      },
+      {
+        "id": 8,
+        "title": "许可证类型分布",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (plan_type) (xhs_licenses_total{status=\"active\"})",
+            "legendFormat": "{{plan_type}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 12
+        }
+      },
+      {
+        "id": 9,
+        "title": "许可证验证结果",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(xhs_license_verifications_total[5m])",
+            "legendFormat": "{{result}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 20
+        }
+      },
+      {
+        "id": 10,
+        "title": "客户端使用排行（AI请求）",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, sum by (client_id) (xhs_ai_requests_total))",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 20
+        }
+      }
+    ]
+  }
+}

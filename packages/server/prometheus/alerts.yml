@@ -1,0 +1,156 @@
+groups:
+  - name: xhs_alerts
+    interval: 30s
+    rules:
+      # 客户端告警
+      - alert: ClientOffline
+        expr: xhs_clients_online < 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "没有在线客户端"
+          description: "所有客户端都已离线超过5分钟"
+
+      - alert: ClientHeartbeatMissing
+        expr: rate(xhs_client_heartbeats_total[5m]) == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "客户端 {{ $labels.client_id }} 心跳丢失"
+          description: "客户端 {{ $labels.client_id }} 在过去10分钟内没有发送心跳"
+
+      # HTTP性能告警
+      - alert: HighHTTPErrorRate
+        expr: rate(xhs_http_requests_total{status_code=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HTTP 5xx错误率过高"
+          description: "{{ $labels.route }} 的5xx错误率超过5%"
+
+      - alert: HighHTTPLatency
+        expr: histogram_quantile(0.95, rate(xhs_http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP请求延迟过高"
+          description: "{{ $labels.route }} 的P95延迟超过2秒"
+
+      # 数据库告警
+      - alert: HighDatabaseLatency
+        expr: histogram_quantile(0.95, rate(xhs_db_query_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "数据库查询延迟过高"
+          description: "{{ $labels.operation }} 操作的P95延迟超过1秒"
+
+      - alert: HighDatabaseConnections
+        expr: xhs_db_connections_active > 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "数据库连接数过高"
+          description: "活跃数据库连接数为 {{ $value }}，超过阈值15"
+
+      # MQTT告警
+      - alert: MQTTDisconnected
+        expr: xhs_mqtt_connection_status == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MQTT连接断开"
+          description: "MQTT broker连接已断开超过2分钟"
+
+      # 同步队列告警
+      - alert: SyncQueueBacklog
+        expr: xhs_sync_queue_size > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "同步队列积压"
+          description: "客户端 {{ $labels.client_id }} 的同步队列大小为 {{ $value }}，超过1000"
+
+      # 许可证告警
+      - alert: LicenseExpiringSoon
+        expr: (xhs_licenses_total{status="active"} - xhs_licenses_total{status="expired"}) < 5
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "活跃许可证数量不足"
+          description: "活跃许可证数量少于5个"
+
+      - alert: HighLicenseVerificationFailure
+        expr: rate(xhs_license_verifications_total{result!="valid"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "许可证验证失败率过高"
+          description: "许可证验证失败率超过10%"
+
+      # 错误告警
+      - alert: HighErrorRate
+        expr: rate(xhs_errors_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "错误率过高"
+          description: "{{ $labels.type }} 类型的错误率超过每秒1次"
+
+      - alert: CriticalError
+        expr: rate(xhs_errors_total{severity="critical"}[1m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "发生严重错误"
+          description: "检测到 {{ $labels.type }} 类型的严重错误"
+
+      # 系统资源告警
+      - alert: HighCPUUsage
+        expr: rate(xhs_server_process_cpu_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU使用率过高"
+          description: "服务器CPU使用率超过80%"
+
+      - alert: HighMemoryUsage
+        expr: xhs_server_process_resident_memory_bytes > 1073741824
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "内存使用过高"
+          description: "服务器内存使用超过1GB"
+
+      # 业务指标告警
+      - alert: NoAIRequests
+        expr: rate(xhs_ai_requests_total[30m]) == 0
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "没有AI请求"
+          description: "过去1小时内没有AI请求"
+
+      - alert: NoPostsPublished
+        expr: rate(xhs_posts_published_total[1h]) == 0
+        for: 2h
+        labels:
+          severity: info
+        annotations:
+          summary: "没有文章发布"
+          description: "过去2小时内没有文章发布"
