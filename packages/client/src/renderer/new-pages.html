@@ -1,0 +1,237 @@
+    <!-- AI提供商管理页面 -->
+    <div id="ai-providers" class="tab-content">
+      <div class="page-header">
+        <h2>🤖 AI提供商管理</h2>
+        <div class="actions">
+          <button onclick="refreshProviders()" class="btn btn-primary">刷新列表</button>
+          <button onclick="clearProviderCache()" class="btn btn-secondary">清除缓存</button>
+        </div>
+      </div>
+
+      <div class="providers-grid" id="providersList">
+        <p class="loading">加载中...</p>
+      </div>
+    </div>
+
+    <!-- 定时发布管理页面 -->
+    <div id="schedules" class="tab-content">
+      <div class="page-header">
+        <h2>⏰ 定时发布管理</h2>
+        <div class="actions">
+          <button onclick="showCreateScheduleModal()" class="btn btn-primary">创建定时任务</button>
+        </div>
+      </div>
+
+      <div class="schedule-list" id="schedulesList">
+        <p class="loading">加载中...</p>
+      </div>
+    </div>
+
+    <!-- 发布历史页面 -->
+    <div id="history" class="tab-content">
+      <div class="page-header">
+        <h2>📊 发布历史统计</h2>
+        <div class="actions">
+          <button onclick="exportHistoryCSV()" class="btn btn-primary">导出CSV</button>
+          <button onclick="refreshHistory()" class="btn btn-secondary">刷新数据</button>
+        </div>
+      </div>
+
+      <!-- 统计卡片 -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>总发布次数</h3>
+          <p class="stat-value" id="statTotalAttempts">-</p>
+        </div>
+        <div class="stat-card">
+          <h3>成功率</h3>
+          <p class="stat-value" id="statSuccessRate">-</p>
+        </div>
+        <div class="stat-card">
+          <h3>平均耗时</h3>
+          <p class="stat-value" id="statAvgDuration">-</p>
+        </div>
+        <div class="stat-card">
+          <h3>失败次数</h3>
+          <p class="stat-value" id="statFailedCount">-</p>
+        </div>
+      </div>
+
+      <!-- 筛选器 -->
+      <div class="history-filters">
+        <select id="historyStatusFilter" onchange="loadPublishHistory()">
+          <option value="">所有状态</option>
+          <option value="success">成功</option>
+          <option value="failed">失败</option>
+        </select>
+        <input type="date" id="historyStartDate" onchange="loadPublishHistory()">
+        <input type="date" id="historyEndDate" onchange="loadPublishHistory()">
+      </div>
+
+      <!-- 历史记录表格 -->
+      <div class="history-table-container">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>文案标题</th>
+              <th>平台</th>
+              <th>状态</th>
+              <th>耗时</th>
+              <th>图片数</th>
+              <th>发布时间</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <tr><td colspan="6" class="loading">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 分页 -->
+      <div class="pagination" id="historyPagination"></div>
+    </div>
+
+    <!-- 热点数据中心页面 -->
+    <div id="trending" class="tab-content">
+      <div class="page-header">
+        <h2>🔥 热点数据中心</h2>
+        <div class="actions">
+          <button onclick="refreshTrending()" class="btn btn-primary">刷新数据</button>
+          <button onclick="clearOldTrending()" class="btn btn-secondary">清理旧数据</button>
+        </div>
+      </div>
+
+      <!-- 平台切换 -->
+      <div class="trending-platforms">
+        <button class="platform-btn active" data-platform="all" onclick="switchPlatform('all')">全部</button>
+        <button class="platform-btn" data-platform="weibo" onclick="switchPlatform('weibo')">微博</button>
+        <button class="platform-btn" data-platform="baidu" onclick="switchPlatform('baidu')">百度</button>
+        <button class="platform-btn" data-platform="toutiao" onclick="switchPlatform('toutiao')">头条</button>
+        <button class="platform-btn" data-platform="bilibili" onclick="switchPlatform('bilibili')">B站</button>
+      </div>
+
+      <!-- 搜索框 -->
+      <div class="trending-search">
+        <input type="text" id="trendingKeyword" placeholder="搜索热点关键词..." />
+        <button onclick="searchTrending()" class="btn btn-primary">搜索</button>
+      </div>
+
+      <!-- 热点列表 -->
+      <div class="trending-list" id="trendingList">
+        <p class="loading">加载中...</p>
+      </div>
+    </div>
+
+    <!-- AI提供商配置模态框 -->
+    <div id="providerModal" class="modal">
+      <div class="modal-content">
+        <span class="close" onclick="closeProviderModal()">&times;</span>
+        <h2>配置AI提供商</h2>
+        <form id="providerForm" onsubmit="saveProvider(event)">
+          <input type="hidden" id="providerName" />
+
+          <div class="form-group">
+            <label>提供商名称</label>
+            <input type="text" id="providerDisplayName" disabled />
+          </div>
+
+          <div class="form-group">
+            <label>API密钥</label>
+            <input type="password" id="providerApiKey" placeholder="输入新的API密钥（留空则不修改）" />
+          </div>
+
+          <div class="form-group">
+            <label>优先级 (0-100，数字越大优先级越高)</label>
+            <input type="number" id="providerPriority" min="0" max="100" required />
+          </div>
+
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="providerEnabled" />
+              启用此提供商
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">保存配置</button>
+            <button type="button" class="btn btn-secondary" onclick="testProviderConnection()">测试连接</button>
+            <button type="button" class="btn btn-secondary" onclick="closeProviderModal()">取消</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 创建定时任务模态框 -->
+    <div id="scheduleModal" class="modal">
+      <div class="modal-content">
+        <span class="close" onclick="closeScheduleModal()">&times;</span>
+        <h2>创建定时任务</h2>
+        <form id="scheduleForm" onsubmit="createSchedule(event)">
+          <div class="form-group">
+            <label>选择文案</label>
+            <select id="schedulePostId" required>
+              <option value="">请选择...</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>调度类型</label>
+            <select id="scheduleType" onchange="updateScheduleConfig()" required>
+              <option value="once">一次性</option>
+              <option value="daily">每日</option>
+              <option value="weekly">每周</option>
+              <option value="monthly">每月</option>
+            </select>
+          </div>
+
+          <div id="scheduleConfigOnce" class="schedule-config">
+            <div class="form-group">
+              <label>执行时间</label>
+              <input type="datetime-local" id="scheduleTime" />
+            </div>
+          </div>
+
+          <div id="scheduleConfigDaily" class="schedule-config" style="display:none;">
+            <div class="form-group">
+              <label>每天几点执行</label>
+              <input type="time" id="scheduleDailyTime" value="09:00" />
+            </div>
+          </div>
+
+          <div id="scheduleConfigWeekly" class="schedule-config" style="display:none;">
+            <div class="form-group">
+              <label>星期几</label>
+              <select id="scheduleWeekDay">
+                <option value="0">周日</option>
+                <option value="1">周一</option>
+                <option value="2">周二</option>
+                <option value="3">周三</option>
+                <option value="4">周四</option>
+                <option value="5">周五</option>
+                <option value="6">周六</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>几点执行</label>
+              <input type="time" id="scheduleWeeklyTime" value="09:00" />
+            </div>
+          </div>
+
+          <div id="scheduleConfigMonthly" class="schedule-config" style="display:none;">
+            <div class="form-group">
+              <label>每月第几天 (1-28)</label>
+              <input type="number" id="scheduleMonthDay" min="1" max="28" value="1" />
+            </div>
+            <div class="form-group">
+              <label>几点执行</label>
+              <input type="time" id="scheduleMonthlyTime" value="09:00" />
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">创建任务</button>
+            <button type="button" class="btn btn-secondary" onclick="closeScheduleModal()">取消</button>
+          </div>
+        </form>
+      </div>
+    </div>

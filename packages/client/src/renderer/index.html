@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小红书知识库发布系统</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- 左侧导航栏 -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>小红书发布系统</h1>
+        <p>AI驱动的智能内容发布平台</p>
+      </div>
+
+      <!-- 登录状态区域 -->
+      <div class="login-status-area">
+        <div id="loginStatusDisplay" class="login-status">
+          <span class="status-icon"></span>
+          <span id="loginStatusText">未登录</span>
+        </div>
+        <div id="currentAccountInfo" class="current-account-info" style="display: none;">
+          <div class="account-name-display">
+            <span class="account-icon"></span>
+            <span id="currentAccountName">-</span>
+          </div>
+          <button class="btn btn-sm btn-secondary" onclick="window.location.href='/accounts.html'">
+            管理账户
+          </button>
+        </div>
+        <button id="showLoginBtn" class="btn btn-sm btn-primary" onclick="showLoginModal()">
+          登录小红书
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-page="knowledge">
+          <span class="nav-icon"></span>
+          知识库
+        </button>
+        <button class="nav-item" data-page="products">
+          <span class="nav-icon"></span>
+          产品管理
+        </button>
+        <button class="nav-item" data-page="posts">
+          <span class="nav-icon"></span>
+          文案管理
+        </button>
+        <button class="nav-item" data-page="generate">
+          <span class="nav-icon"></span>
+          生成文案
+        </button>
+        <button class="nav-item" data-page="ai-providers">
+          <span class="nav-icon"></span>
+          AI提供商
+        </button>
+        <button class="nav-item" data-page="schedules">
+          <span class="nav-icon"></span>
+          定时发布
+        </button>
+        <button class="nav-item" data-page="history">
+          <span class="nav-icon"></span>
+          发布历史
+        </button>
+        <button class="nav-item" data-page="trending">
+          <span class="nav-icon"></span>
+          热点数据
+        </button>
+        <button class="nav-item" data-page="accounts">
+          <span class="nav-icon"></span>
+          账号管理
+        </button>
+      </nav>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+      <!-- 知识库页面 -->
+      <div id="knowledge" class="page-view active">
+      <div class="page-header">
+        <h2>知识库管理</h2>
+        <div class="actions">
+          <button onclick="cleanupAndRescan()" class="btn btn-primary" style="background: #f44336;">🔄 清空并重新扫描</button>
+          <button onclick="scanKnowledge()" class="btn btn-primary">扫描知识库</button>
+          <button onclick="toggleCategoryTree()" class="btn btn-secondary">显示分类树</button>
+        </div>
+      </div>
+
+      <!-- 知识库路径配置 -->
+      <div class="knowledge-config-section" style="margin-bottom: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+          <label style="font-weight: bold; min-width: 100px;">知识库路径:</label>
+          <input type="text" id="knowledgePathInput" placeholder="点击浏览按钮选择文件夹，或手动输入路径"
+                 style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+          <button onclick="showDirectoryBrowser()" class="btn btn-secondary">浏览</button>
+          <button onclick="updateKnowledgePath()" class="btn btn-primary">更改路径</button>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="min-width: 100px;"></span>
+          <div id="currentKnowledgePath" style="font-size: 12px; color: #666;">
+            加载中...
+          </div>
+        </div>
+      </div>
+
+      <div id="categoryTree" class="category-tree" style="display: none;">
+        <h3>知识库分类</h3>
+        <div id="categoryTreeContent">
+          <p class="loading">加载中...</p>
+        </div>
+      </div>
+
+      <div class="search-bar">
+        <input type="text" id="searchDocs" placeholder="搜索文档..." onkeyup="searchDocs()">
+        <select id="filterCategory" onchange="loadDocs()">
+          <option value="">全部分类</option>
+        </select>
+      </div>
+
+      <div id="docsList" class="docs-list">
+        <p class="loading">加载中...</p>
+      </div>
+    </div>
+
+      <!-- 产品管理页面 -->
+      <div id="products" class="page-view">
+      <div class="page-header">
+        <h2>产品管理</h2>
+        <div class="actions">
+          <button onclick="autoScanProducts()" class="btn btn-primary">自动扫描产品</button>
+          <button onclick="showAddProductForm()" class="btn btn-secondary">手动添加产品</button>
+        </div>
+      </div>
+
+      <div id="productsList" class="products-list">
+        <p class="loading">加载中...</p>
+      </div>
+    </div>
+
+      <!-- 文案管理页面 -->
+      <div id="posts" class="page-view">
+      <div class="page-header">
+        <h2>文案管理</h2>
+        <div class="actions">
+          <select id="filterStatus" onchange="loadPosts()">
+            <option value="">全部状态</option>
+            <option value="draft">草稿</option>
+            <option value="published">已发布</option>
+            <option value="failed">发布失败</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 批量操作栏 -->
+      <div id="batchActionsBar" class="batch-actions-bar" style="display: none;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <label class="form-check">
+            <input type="checkbox" id="selectAllPosts" onchange="toggleSelectAll()" class="form-checkbox">
+            全选
+          </label>
+          <span id="selectedCount" style="color: var(--gray-600); font-size: 0.875rem;">已选择 0 项</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button onclick="batchDelete()" class="btn btn-danger btn-sm">批量删除</button>
+          <button onclick="cancelBatchMode()" class="btn btn-secondary btn-sm">取消</button>
+        </div>
+      </div>
+
+      <!-- 常规操作栏 -->
+      <div id="normalActionsBar" class="page-actions">
+        <button onclick="enterBatchMode()" class="btn btn-secondary">批量操作</button>
+      </div>
+
+      <!-- 当前使用账号显示 -->
+      <div id="currentAccountInfo" class="card" style="margin-bottom: 24px; background: var(--glass-bg-hover);">
+        <div class="card-body" style="padding: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 20px;"></span>
+              <div>
+                <div style="font-size: 14px; opacity: 0.7; margin-bottom: 4px;">当前发布账号</div>
+                <div id="currentAccountName" style="font-weight: 600; font-size: 16px;">加载中...</div>
+              </div>
+            </div>
+            <button onclick="switchPage('accounts')" class="btn btn-secondary btn-sm">
+              切换账号
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="postsList" class="posts-list">
+        <p class="loading">加载中...</p>
+      </div>
+    </div>
+
+      <!-- 生成文案页面 -->
+      <div id="generate" class="page-view">
+        <div class="page-header">
+          <h2>AI生成文案</h2>
+          <p>使用AI智能生成小红书营销文案</p>
+        </div>
+
+        <!-- 生成表单卡片 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">内容生成配置</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">选择产品 *</label>
+              <select id="selectProduct" onchange="loadProductImages()" required class="form-select">
+                <option value="">请选择产品...</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="productImagesSection" style="display: none;">
+              <label class="form-label">选择产品图片（可选）</label>
+              <p class="form-hint">您可以选择产品管理中的图片，选中的图片会自动添加到发布图片中</p>
+              <div id="productImagesSelector" class="product-images-grid">
+                <!-- 产品图片将动态加载到这里 -->
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">文案风格 *</label>
+              <p class="form-hint">选择适合的文案风格，AI会根据风格调整内容的语气和结构</p>
+              <div class="style-selector">
+                <div class="style-option" data-style="种草型" onclick="selectStyle('种草型')">
+                  <div class="style-icon"></div>
+                  <div class="style-name">种草型</div>
+                  <div class="style-desc">推荐产品，强调效果和体验</div>
+                </div>
+                <div class="style-option" data-style="教程型" onclick="selectStyle('教程型')">
+                  <div class="style-icon"></div>
+                  <div class="style-name">教程型</div>
+                  <div class="style-desc">详细步骤，实用干货分享</div>
+                </div>
+                <div class="style-option" data-style="测评型" onclick="selectStyle('测评型')">
+                  <div class="style-icon"></div>
+                  <div class="style-name">测评型</div>
+                  <div class="style-desc">客观评价，优缺点分析</div>
+                </div>
+                <div class="style-option" data-style="故事型" onclick="selectStyle('故事型')">
+                  <div class="style-icon"></div>
+                  <div class="style-name">故事型</div>
+                  <div class="style-desc">讲述经历，引发情感共鸣</div>
+                </div>
+                <div class="style-option" data-style="清单型" onclick="selectStyle('清单型')">
+                  <div class="style-icon"></div>
+                  <div class="style-name">清单型</div>
+                  <div class="style-desc">多个要点，条理清晰</div>
+                </div>
+                <div class="style-option" data-style="问答型" onclick="selectStyle('问答型')">
+                  <div class="style-icon"></div>
+                  <div class="style-name">问答型</div>
+                  <div class="style-desc">解答疑问，针对性强</div>
+                </div>
+                <div class="style-option" data-style="对比型" onclick="selectStyle('对比型')">
+                  <div class="style-icon"></div>
+                  <div class="style-name">对比型</div>
+                  <div class="style-desc">前后对比，突出变化</div>
+                </div>
+                <div class="style-option" data-style="幽默型" onclick="selectStyle('幽默型')">
+                  <div class="style-icon"></div>
+                  <div class="style-name">幽默型</div>
+                  <div class="style-desc">轻松搞笑，增加互动</div>
+                </div>
+                <div class="style-option" data-style="治愈型" onclick="selectStyle('治愈型')">
+                  <div class="style-icon"></div>
+                  <div class="style-name">治愈型</div>
+                  <div class="style-desc">温暖鼓励，抚慰心灵</div>
+                </div>
+                <div class="style-option" data-style="专业型" onclick="selectStyle('专业型')">
+                  <div class="style-icon"></div>
+                  <div class="style-name">专业型</div>
+                  <div class="style-desc">科学严谨，权威可信</div>
+                </div>
+              </div>
+              <input type="hidden" id="contentStyle" value="种草型">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">目标受众</label>
+              <input type="text" id="targetAudience" value="大众" placeholder="例如: 年轻女性、健身爱好者等" class="form-input">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">生成字数</label>
+              <div class="word-count-slider">
+                <input type="range" id="wordCountSlider" min="400" max="1500" value="800" step="50" class="slider">
+                <div class="slider-labels">
+                  <span>400字</span>
+                  <span id="wordCountValue" class="slider-value">800字</span>
+                  <span>1500字</span>
+                </div>
+              </div>
+              <p class="form-hint">建议500-1000字，小红书单篇笔记最多1000字</p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">AI模型</label>
+              <select id="aiModel" onchange="updateModelInfo()" class="form-select">
+                <option value="">加载中...</option>
+              </select>
+            </div>
+
+            <!-- 反AIGC优化 -->
+            <div class="form-group">
+              <label class="form-label">
+                <input type="checkbox" id="useV2" checked style="margin-right: 8px;">
+                启用反AIGC优化
+              </label>
+              <p class="form-hint">使用敏感词替换、口语化、错别字等策略，让内容更自然，降低AI痕迹</p>
+            </div>
+
+            <!-- Phase 2: 热门笔记学习 -->
+            <div class="form-group">
+              <label class="form-label">
+                <input type="checkbox" id="learnFromHot" onchange="toggleHotKeywords()" style="margin-right: 8px;">
+                学习热门笔记风格
+              </label>
+              <p class="form-hint">从小红书热门笔记中学习写作风格和表达方式（需配置XHS_COOKIE）</p>
+            </div>
+
+            <div class="form-group" id="hotKeywordsGroup" style="display: none;">
+              <label class="form-label">热门笔记关键词</label>
+              <input type="text" id="hotKeywords" placeholder="例如: 护肤品、美妆" class="form-input">
+              <p class="form-hint">输入关键词以搜索相关热门笔记作为参考</p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">参考知识库（可选）</label>
+              <div id="knowledgeSelector" class="checkbox-group">
+                <p class="loading">加载中...</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <button onclick="generateContent()" class="btn btn-primary btn-block btn-lg" id="generateBtn">
+              生成文案
+            </button>
+          </div>
+        </div>
+
+        <!-- 生成进度提示 -->
+        <div id="generatingProgress" class="generating-progress" style="display: none;">
+          <div class="progress-content">
+            <div class="spinner"></div>
+            <h3>AI正在生成文案...</h3>
+            <p class="progress-text">这可能需要10-30秒，请耐心等待</p>
+            <div class="progress-bar">
+              <div class="progress-bar-fill"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 生成结果卡片 -->
+        <div id="generatedContent" class="card mt-4" style="display: none;">
+          <div class="card-header">
+            <h3 class="card-title">生成的文案</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">标题</label>
+              <input type="text" id="generatedTitle" readonly class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">正文</label>
+              <textarea id="generatedText" rows="15" readonly class="form-textarea"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">标签</label>
+              <div id="generatedTags"></div>
+            </div>
+
+            <!-- AIGC评分和敏感词信息 -->
+            <div class="form-group" id="aigcMetadata" style="display: none;">
+              <label class="form-label">内容质量指标</label>
+              <div class="aigc-metadata">
+                <div class="metadata-item">
+                  <span class="metadata-label">AIGC评分:</span>
+                  <span id="aigcScore" class="aigc-score">-</span>
+                </div>
+                <div class="metadata-item">
+                  <span class="metadata-label">敏感词检测:</span>
+                  <span id="sensitiveWords" class="sensitive-words">-</span>
+                </div>
+                <div class="metadata-item" id="hotPostsRef" style="display: none;">
+                  <span class="metadata-label">参考热门笔记:</span>
+                  <span id="hotPostsCount" class="hot-posts-count">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 内容分析 -->
+            <div class="form-group">
+              <label class="form-label">内容分析</label>
+              <div id="contentAnalysis" class="content-analysis">
+                <!-- 分析结果将动态加载 -->
+              </div>
+            </div>
+
+            <!-- 语法检查 -->
+            <div class="form-group">
+              <label class="form-label">语法检查</label>
+              <div class="grammar-check-actions">
+                <button type="button" onclick="checkGrammar('quick')" class="btn btn-secondary btn-sm">快速检查</button>
+                <button type="button" onclick="checkGrammar('full')" class="btn btn-primary btn-sm">完整检查（AI）</button>
+              </div>
+              <div id="grammarCheckResult" class="grammar-check-result" style="display: none;">
+                <!-- 语法检查结果将动态加载 -->
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">上传图片 <span class="text-error">*必填（至少1张）</span></label>
+              <input type="file" id="postImages" accept="image/*" multiple class="file-input">
+              <p class="form-hint">小红书要求至少1张图片，建议3-9张。支持 JPG、PNG 格式</p>
+
+              <!-- 上传进度条 -->
+              <div id="uploadProgress" class="upload-progress" style="display: none;">
+                <div class="upload-progress-header">
+                  <span id="uploadProgressText">正在上传...</span>
+                  <span id="uploadProgressCount">0/0</span>
+                </div>
+                <div class="upload-progress-bar">
+                  <div id="uploadProgressFill" class="upload-progress-fill"></div>
+                </div>
+              </div>
+
+              <div id="imagePreview" class="image-preview"></div>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <div class="flex gap-3 justify-between">
+              <button onclick="editPost(currentPostId)" class="btn btn-secondary">编辑</button>
+              <button onclick="publishPost(currentPostId)" class="btn btn-primary">发布到小红书</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI提供商管理页面 -->
+      <div id="ai-providers" class="page-view">
+      <div class="page-header">
+        <h2>AI提供商管理</h2>
+        <div class="actions">
+          <button onclick="refreshProviders()" class="btn btn-primary">刷新列表</button>
+          <button onclick="clearProviderCache()" class="btn btn-secondary">清除缓存</button>
+        </div>
+      </div>
+
+      <div class="providers-grid" id="providersList">
+        <p class="loading">加载中...</p>
+      </div>
+    </div>
+
+      <!-- 定时发布管理页面 -->
+      <div id="schedules" class="page-view">
+      <div class="page-header">
+        <h2>定时发布管理</h2>
+        <div class="actions">
+          <button onclick="showCreateScheduleModal()" class="btn btn-primary">创建定时任务</button>
+        </div>
+      </div>
+
+      <div class="schedule-list" id="schedulesList">
+        <p class="loading">加载中...</p>
+      </div>
+    </div>
+
+      <!-- 发布历史页面 -->
+      <div id="history" class="page-view">
+      <div class="page-header">
+        <h2>发布历史统计</h2>
+        <div class="actions">
+          <button onclick="exportHistoryCSV()" class="btn btn-primary">导出CSV</button>
+          <button onclick="refreshHistory()" class="btn btn-secondary">刷新数据</button>
+        </div>
+      </div>
+
+      <!-- 统计卡片 -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>总发布次数</h3>
+          <p class="stat-value" id="statTotalAttempts">-</p>
+        </div>
+        <div class="stat-card">
+          <h3>成功率</h3>
+          <p class="stat-value" id="statSuccessRate">-</p>
+        </div>
+        <div class="stat-card">
+          <h3>平均耗时</h3>
+          <p class="stat-value" id="statAvgDuration">-</p>
+        </div>
+        <div class="stat-card">
+          <h3>失败次数</h3>
+          <p class="stat-value" id="statFailedCount">-</p>
+        </div>
+      </div>
+
+      <!-- 筛选器 -->
+      <div class="history-filters">
+        <select id="historyStatusFilter" onchange="loadPublishHistory()">
+          <option value="">所有状态</option>
+          <option value="success">成功</option>
+          <option value="failed">失败</option>
+        </select>
+        <input type="date" id="historyStartDate" onchange="loadPublishHistory()">
+        <input type="date" id="historyEndDate" onchange="loadPublishHistory()">
+      </div>
+
+      <!-- 历史记录表格 -->
+      <div class="history-table-container">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>文案标题</th>
+              <th>平台</th>
+              <th>状态</th>
+              <th>耗时</th>
+              <th>图片数</th>
+              <th>发布时间</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <tr><td colspan="6" class="loading">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 分页 -->
+      <div class="pagination" id="historyPagination"></div>
+    </div>
+
+      <!-- 热点数据中心页面 -->
+      <div id="trending" class="page-view">
+      <div class="page-header">
+        <h2>热点数据中心</h2>
+        <div class="actions">
+          <button onclick="refreshTrending()" class="btn btn-primary">刷新数据</button>
+          <button onclick="clearOldTrending()" class="btn btn-secondary">清理旧数据</button>
+        </div>
+      </div>
+
+      <!-- 平台切换 -->
+      <div class="trending-platforms">
+        <button class="platform-btn active" data-platform="all" onclick="switchPlatform('all')">全部</button>
+        <button class="platform-btn" data-platform="weibo" onclick="switchPlatform('weibo')">微博</button>
+        <button class="platform-btn" data-platform="baidu" onclick="switchPlatform('baidu')">百度</button>
+        <button class="platform-btn" data-platform="toutiao" onclick="switchPlatform('toutiao')">头条</button>
+        <button class="platform-btn" data-platform="bilibili" onclick="switchPlatform('bilibili')">B站</button>
+      </div>
+
+      <!-- 搜索框 -->
+      <div class="trending-search">
+        <input type="text" id="trendingKeyword" placeholder="搜索热点关键词..." />
+        <button onclick="searchTrending()" class="btn btn-primary">搜索</button>
+      </div>
+
+      <!-- 热点列表 -->
+      <div class="trending-list" id="trendingList">
+        <p class="loading">加载中...</p>
+      </div>
+    </div>
+
+      <!-- 账号管理页面 -->
+      <div id="accounts" class="page-view">
+        <div class="page-header">
+          <h2>账号管理</h2>
+          <p>管理多个小红书账号，支持快速切换</p>
+        </div>
+
+        <div class="page-actions">
+          <button onclick="showAddAccountModal()" class="btn btn-primary">➕ 添加账号</button>
+          <button onclick="loadAccounts()" class="btn btn-secondary">刷新列表</button>
+        </div>
+
+        <!-- 账号列表 -->
+        <div id="accountsList" class="cards-grid">
+          <p class="loading">加载中...</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 模态框 -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- 小红书登录引导模态框 -->
+  <div id="xhsLoginModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>登录小红书账号</h2>
+        <span class="close" onclick="closeXhsLoginModal()">&times;</span>
+      </div>
+
+      <div class="modal-body">
+        <p class="login-guide-text">使用小红书 APP 扫描下方二维码登录</p>
+
+        <div class="qrcode-container" style="text-align: center; padding: 20px;">
+          <div id="qrcodeLoading" class="loading">正在加载二维码...</div>
+          <img id="qrcodeImage" style="display: none; max-width: 250px; margin: 0 auto;" alt="登录二维码">
+        </div>
+
+        <div id="loginStatusMessage" class="login-status-message" style="text-align: center; margin-top: 15px;"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button onclick="refreshQRCode()" class="btn btn-secondary">刷新二维码</button>
+        <button onclick="closeXhsLoginModal()" class="btn btn-secondary">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 发布进度模态框 -->
+  <div id="publishProgressModal" class="modal">
+    <div class="modal-content">
+      <h2>正在发布到小红书</h2>
+      <p class="publish-guide-text">请耐心等待，发布过程可能需要1-3分钟...</p>
+
+      <div class="publish-progress-container">
+        <div class="publish-step" id="publishStep1">
+          <div class="step-icon">⏳</div>
+          <div class="step-content">
+            <h4>准备发布数据</h4>
+            <p class="step-status">准备中...</p>
+          </div>
+        </div>
+
+        <div class="publish-step" id="publishStep2">
+          <div class="step-icon"></div>
+          <div class="step-content">
+            <h4>上传图片到小红书</h4>
+            <p class="step-status">等待中...</p>
+          </div>
+        </div>
+
+        <div class="publish-step" id="publishStep3">
+          <div class="step-icon"></div>
+          <div class="step-content">
+            <h4>发布笔记内容</h4>
+            <p class="step-status">等待中...</p>
+          </div>
+        </div>
+
+        <div class="publish-step" id="publishStep4">
+          <div class="step-icon">✅</div>
+          <div class="step-content">
+            <h4>发布完成</h4>
+            <p class="step-status">等待中...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="publish-progress-bar-wrapper">
+        <div class="publish-progress-bar">
+          <div id="publishProgressFill" class="publish-progress-fill"></div>
+        </div>
+        <div class="publish-progress-text" id="publishProgressText">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="notification" class="notification"></div>
+
+  <!-- AI提供商配置模态框 -->
+  <div id="providerModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeProviderModal()">&times;</span>
+      <h2>配置AI提供商</h2>
+      <form id="providerForm" onsubmit="saveProvider(event)">
+        <input type="hidden" id="providerName" />
+
+        <div class="form-group">
+          <label>提供商名称</label>
+          <input type="text" id="providerDisplayName" disabled />
+        </div>
+
+        <div class="form-group">
+          <label>API密钥</label>
+          <input type="password" id="providerApiKey" placeholder="输入新的API密钥（留空则不修改）" />
+        </div>
+
+        <div class="form-group">
+          <label>优先级 (0-100，数字越大优先级越高)</label>
+          <input type="number" id="providerPriority" min="0" max="100" required />
+        </div>
+
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="providerEnabled" />
+            启用此提供商
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">保存配置</button>
+          <button type="button" class="btn btn-secondary" onclick="testProviderConnection()">测试连接</button>
+          <button type="button" class="btn btn-secondary" onclick="closeProviderModal()">取消</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 创建定时任务模态框 -->
+  <div id="scheduleModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeScheduleModal()">&times;</span>
+      <h2>创建定时任务</h2>
+      <form id="scheduleForm" onsubmit="createSchedule(event)">
+        <div class="form-group">
+          <label>选择文案</label>
+          <select id="schedulePostId" required>
+            <option value="">请选择...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>调度类型</label>
+          <select id="scheduleType" onchange="updateScheduleConfig()" required>
+            <option value="once">一次性</option>
+            <option value="daily">每日</option>
+            <option value="weekly">每周</option>
+            <option value="monthly">每月</option>
+          </select>
+        </div>
+
+        <div id="scheduleConfigOnce" class="schedule-config">
+          <div class="form-group">
+            <label>执行时间</label>
+            <input type="datetime-local" id="scheduleTime" />
+          </div>
+        </div>
+
+        <div id="scheduleConfigDaily" class="schedule-config" style="display:none;">
+          <div class="form-group">
+            <label>每天几点执行</label>
+            <input type="time" id="scheduleDailyTime" value="09:00" />
+          </div>
+        </div>
+
+        <div id="scheduleConfigWeekly" class="schedule-config" style="display:none;">
+          <div class="form-group">
+            <label>星期几</label>
+            <select id="scheduleWeekDay">
+              <option value="0">周日</option>
+              <option value="1">周一</option>
+              <option value="2">周二</option>
+              <option value="3">周三</option>
+              <option value="4">周四</option>
+              <option value="5">周五</option>
+              <option value="6">周六</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>几点执行</label>
+            <input type="time" id="scheduleWeeklyTime" value="09:00" />
+          </div>
+        </div>
+
+        <div id="scheduleConfigMonthly" class="schedule-config" style="display:none;">
+          <div class="form-group">
+            <label>每月第几天 (1-28)</label>
+            <input type="number" id="scheduleMonthDay" min="1" max="28" value="1" />
+          </div>
+          <div class="form-group">
+            <label>几点执行</label>
+            <input type="time" id="scheduleMonthlyTime" value="09:00" />
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">创建任务</button>
+          <button type="button" class="btn btn-secondary" onclick="closeScheduleModal()">取消</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 账号管理模态框 -->
+  <div id="accountModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeAccountModal()">&times;</span>
+      <h2 id="accountModalTitle">添加账号</h2>
+      <form id="accountForm" onsubmit="saveAccount(event)">
+        <input type="hidden" id="accountId" />
+
+        <div class="form-group">
+          <label class="form-label">账号名称 *</label>
+          <input type="text" id="accountName" required class="form-input" placeholder="例如: 我的主账号">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">手机号</label>
+          <input type="tel" id="accountPhone" class="form-input" placeholder="可选">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">邮箱</label>
+          <input type="email" id="accountEmail" class="form-input" placeholder="可选">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">小红书昵称</label>
+          <input type="text" id="accountNickname" class="form-input" placeholder="可选">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">小红书ID</label>
+          <input type="text" id="accountXhsUserId" class="form-input" placeholder="可选">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">头像URL</label>
+          <input type="url" id="accountAvatar" class="form-input" placeholder="可选">
+        </div>
+
+        <div class="form-group">
+          <label class="form-check">
+            <input type="checkbox" id="accountPrimary" class="form-checkbox">
+            设为主账号
+          </label>
+          <p class="form-hint">主账号将作为默认发布账号</p>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">保存</button>
+          <button type="button" class="btn btn-secondary" onclick="closeAccountModal()">取消</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 目录浏览器模态框 -->
+  <div id="directoryBrowserModal" class="modal">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <h2>选择知识库文件夹</h2>
+        <span class="close" onclick="closeDirectoryBrowser()">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 15px; padding: 10px; background: #f0f0f0; border-radius: 4px; display: flex; align-items: center; gap: 10px;">
+          <button onclick="navigateToParent()" class="btn btn-sm btn-secondary" id="parentDirBtn" disabled>上级目录</button>
+          <div id="currentDirPath" style="flex: 1; font-family: monospace; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            加载中...
+          </div>
+        </div>
+        <div id="directoryList" style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px;">
+          <p style="text-align: center; color: #999;">加载中...</p>
+        </div>
+        <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: flex-end;">
+          <button onclick="closeDirectoryBrowser()" class="btn btn-secondary">取消</button>
+          <button onclick="selectCurrentDirectory()" class="btn btn-primary">选择当前目录</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,512 @@
+/**
+ * Prompt模板管理服务
+ *
+ * 功能：
+ * - 管理所有AI生成相关的Prompt模板
+ * - 提供style guides（10种内容风格）
+ * - 提供v2.2版本的高级创作Prompt
+ * - 集成反AIGC策略和敏感词规避
+ *
+ * 参考：xhs-ai-writer v2.2 Prompt工程
+ */
+
+import * as antiAigcStrategies from '../utils/antiAigcStrategies.js';
+
+/**
+ * 小红书内容风格指南
+ * 10种预定义风格，每种包含描述、语气、结构和关键词
+ */
+const STYLE_GUIDES = {
+  "种草型": {
+    desc: "以真实体验为核心，强调产品效果和使用感受，激发购买欲望",
+    tone: "热情、真诚、带有个人情感",
+    structure: "开场吸引 → 产品介绍 → 使用体验 → 效果展示 → 购买建议",
+    keywords: ["真实感受", "亲测有效", "强烈推荐", "值得入手", "不踩雷"]
+  },
+  "教程型": {
+    desc: "提供详细的步骤指导，帮助用户解决具体问题或学会某项技能",
+    tone: "清晰、耐心、循序渐进",
+    structure: "问题引入 → 准备工作 → 分步教学 → 注意事项 → 效果展示",
+    keywords: ["详细教程", "手把手教", "零基础", "简单易学", "实用技巧"]
+  },
+  "测评型": {
+    desc: "客观评价产品优缺点，提供多维度对比分析",
+    tone: "客观、理性、有依据",
+    structure: "产品概述 → 优点分析 → 缺点指出 → 对比评测 → 购买建议",
+    keywords: ["真实测评", "优缺点", "性价比", "值不值", "对比分析"]
+  },
+  "故事型": {
+    desc: "通过个人经历或故事情节，自然引出产品或观点",
+    tone: "生动、有画面感、情感丰富",
+    structure: "故事开端 → 情节发展 → 转折点 → 问题解决 → 感悟总结",
+    keywords: ["真实故事", "亲身经历", "意外发现", "改变", "感动"]
+  },
+  "清单型": {
+    desc: "整理归纳多个要点，提供系统化的信息汇总",
+    tone: "简洁、有条理、信息密集",
+    structure: "主题引入 → 清单列举 → 逐项说明 → 使用建议 → 总结提示",
+    keywords: ["必备清单", "合集", "盘点", "推荐", "不能错过"]
+  },
+  "问答型": {
+    desc: "针对常见问题提供解答，解决用户疑惑",
+    tone: "专业、耐心、通俗易懂",
+    structure: "问题提出 → 原因分析 → 解决方案 → 补充说明 → 总结建议",
+    keywords: ["常见问题", "怎么办", "为什么", "解决方法", "避坑指南"]
+  },
+  "对比型": {
+    desc: "通过前后对比展示变化效果，增强说服力",
+    tone: "直观、有冲击力、数据化",
+    structure: "初始状态 → 使用过程 → 对比展示 → 数据说明 → 效果总结",
+    keywords: ["前后对比", "变化", "效果显著", "看得见", "数据说话"]
+  },
+  "幽默型": {
+    desc: "用轻松幽默的方式传达信息，增加趣味性",
+    tone: "轻松、有趣、自嘲",
+    structure: "搞笑开场 → 趣味描述 → 反转惊喜 → 幽默总结 → 互动结尾",
+    keywords: ["笑死", "太真实了", "社死现场", "搞笑", "沙雕"]
+  },
+  "治愈型": {
+    desc: "传递温暖正能量，给予情感支持和鼓励",
+    tone: "温柔、治愈、充满关怀",
+    structure: "情感共鸣 → 理解安慰 → 积极引导 → 温暖鼓励 → 美好祝愿",
+    keywords: ["温暖", "治愈", "陪伴", "理解", "加油"]
+  },
+  "专业型": {
+    desc: "提供专业知识和深度分析，建立权威感",
+    tone: "专业、严谨、有深度",
+    structure: "专业引入 → 原理解析 → 数据支撑 → 深度分析 → 专业建议",
+    keywords: ["专业分析", "科学依据", "深度解读", "权威", "研究表明"]
+  }
+};
+
+/**
+ * 标题公式示例
+ */
+const TITLE_FORMULAS_EXAMPLES = [
+  "公式1: [提问式] - 引发读者好奇心 (控制在20字内)",
+  "公式2: [共鸣式] - 点出目标读者痛点 (控制在20字内)",
+  "公式3: [数据型] - 用数字凸显干货或成果 (控制在20字内)",
+  "公式4: [清单式] - 标明是干货合集或盘点 (控制在20字内)",
+  "公式5: [明确受众+利益点] - 如 '人群+解决方案' (控制在20字内)"
+];
+
+/**
+ * 内容结构示例
+ */
+const CONTENT_STRUCTURE_EXAMPLES = {
+  openingHooks: [
+    "开头方式1: '与我有关'式，例如：'身高158的姐妹看过来！'（适合特定群体）",
+    "开头方式2: '打招呼'式，例如：'哈喽宝子们，今天分享一下...'（适合女性向）",
+    "开头方式3: '痛点切入'式，例如：'还在为小腿粗烦恼吗？'（中性表达）",
+    "开头方式4: '告诫劝说'式，例如：'听我的，千万别买这个！'（中性表达）",
+    "开头方式5: '热点/明星'式，例如：'学到了！原来欧阳娜娜是这样穿的...'（适合追星群体）",
+    "开头方式6: '中性问候'式，例如：'大家好，今天来聊聊...'（适合专业/男性向内容）",
+    "开头方式7: '专业切入'式，例如：'作为一个用了3年的老用户，必须说说...'（适合测评/专业内容）",
+    "开头方式8: '场景代入'式，例如：'昨天闺蜜聚会，她们都在问我最近皮肤怎么变好了'（生活化场景）",
+    "开头方式9: '小故事'式，例如：'上周去见前任，他愣了3秒说：你是不是整容了？'（故事化开头）",
+    "开头方式10: '时间锚点'式，例如：'用了整整一个月，今天必须来交作业了'（时间线叙事）"
+  ],
+  storyTemplates: [
+    "发现问题 → 寻找解决方案的心路历程 → 意外发现 → 使用过程趣事 → 效果展示 → 生活改变",
+    "朋友推荐 → 半信半疑 → 第一次尝试的忐忑 → 惊喜发现 → 持续使用体验 → 真心推荐理由",
+    "偶然接触 → 初次体验 → 过程中的小插曲 → 意外收获 → 分享给他人的反应 → 总结感悟"
+  ],
+  endingHooks: [
+    "结尾方式1: '互动式'，例如：'你们还有什么好方法？评论区告诉我！'",
+    "结尾方式2: '结论式'，例如：'总结一下，这三款里面我最推荐...'",
+    "结尾方式3: '劝勉式'，例如：'信我，闭眼入，绝对不亏！'",
+    "结尾方式4: '悬念式'，例如：'下期我再分享更多隐藏好物...'",
+    "结尾方式5: '感谢式'，例如：'感谢看到这里的宝贝，记得点赞收藏哦！'"
+  ]
+};
+
+/**
+ * 封面风格示例
+ */
+const COVER_STYLES_EXAMPLES = [
+  "大字报封面: 强话题性文案，视觉冲击力强",
+  "攻略/合集封面: 多图拼贴，信息量大",
+  "对比类封面: 左右分屏对比前后效果，反差强烈",
+  "真人出镜封面: 提高亲和力和信任度",
+  "聊天记录/备忘录封面: 增强内容真实感"
+];
+
+/**
+ * 趣味性写作元素
+ */
+const ENGAGING_WRITING_ELEMENTS = {
+  humorTechniques: [
+    "自嘲式幽默：'作为一个手残党，我居然也能...'",
+    "夸张式描述：'效果好到我怀疑人生'",
+    "反差萌：'1米8的糙汉子也需要护肤好吗'",
+    "网络热梗：适度使用当下流行语和表情包文案"
+  ],
+  storyElements: [
+    "时间线叙事：从早到晚/从第一次到现在",
+    "对比叙事：使用前vs使用后的戏剧性变化",
+    "情景再现：还原当时的对话和心理活动",
+    "小剧场：设置一个有趣的使用场景"
+  ],
+  emotionalHooks: [
+    "共鸣点：'有没有姐妹和我一样...'",
+    "惊喜感：'万万没想到...'",
+    "成就感：'终于找到了适合自己的...'",
+    "温情时刻：'想起了妈妈说的话...'"
+  ]
+};
+
+/**
+ * 获取style guide
+ * @param {string} style - 风格名称
+ * @returns {Object} style guide对象
+ */
+function getStyleGuide(style) {
+  return STYLE_GUIDES[style] || STYLE_GUIDES["专业型"];
+}
+
+/**
+ * 获取所有可用的风格列表
+ * @returns {Array} 风格名称数组
+ */
+function getAvailableStyles() {
+  return Object.keys(STYLE_GUIDES);
+}
+
+/**
+ * 转义可能破坏提示词结构的特殊字符
+ * @param {string} content - 原始内容
+ * @returns {string} 转义后的安全内容
+ */
+function escapePromptContent(content) {
+  // 使用JSON.stringify安全转义内容
+  const jsonString = JSON.stringify(content);
+  // 去掉首尾的双引号
+  const escapedContent = jsonString.slice(1, -1);
+  // 额外转义可能破坏模板的字符
+  return escapedContent
+    .replace(/\$\{/g, '\\${')
+    .replace(/<\/script>/gi, '<\\/script>')
+    .replace(/```/g, '\\`\\`\\`');
+}
+
+/**
+ * 生成基础内容生成Prompt（单阶段模式）
+ * @param {Object} productInfo - 产品信息
+ * @param {string} knowledgeBase - 知识库内容
+ * @param {string} style - 内容风格
+ * @param {string} targetAudience - 目标受众
+ * @returns {string} Prompt文本
+ */
+function getBasicGenerationPrompt(productInfo, knowledgeBase, style, targetAudience) {
+  const styleGuide = getStyleGuide(style);
+
+  return `你是一位专业的小红书内容创作者，擅长创作${style}风格的笔记。
+
+**产品信息：**
+${JSON.stringify(productInfo, null, 2)}
+
+**参考知识库：**
+${knowledgeBase ? knowledgeBase.substring(0, 10000) : '无'}
+
+**风格指南：**
+- 描述：${styleGuide.desc}
+- 语气：${styleGuide.tone}
+- 结构：${styleGuide.structure}
+- 关键词：${styleGuide.keywords.join('、')}
+
+**目标受众：** ${targetAudience}
+
+**创作要求：**
+1. 标题：20字以内（emoji算2字），吸引眼球
+2. 正文：450-750字，包含5-8个emoji，自然融入
+3. 标签：10-15个相关标签
+4. 语言：口语化、真实、有感染力
+5. 禁用：绝对化词语（最、第一等）、医疗术语、夸大宣传
+
+**输出格式（严格JSON）：**
+\`\`\`json
+{
+  "title": "标题文本",
+  "content": "正文内容",
+  "tags": ["标签1", "标签2", "标签3"]
+}
+\`\`\`
+
+请直接输出JSON，不要有任何额外说明。`;
+}
+
+/**
+ * 生成高级v2.2/v2.3版本的内容生成Prompt
+ * 集成反AIGC策略、反流水账规则、自检闭环
+ * v2.3新增：热门笔记风格学习
+ *
+ * @param {Object} productInfo - 产品信息
+ * @param {string} knowledgeBase - 知识库内容
+ * @param {string} style - 内容风格
+ * @param {string} targetAudience - 目标受众
+ * @param {Array} hotPosts - 热门笔记数据（可选，v2.3功能）
+ * @returns {string} Prompt文本
+ */
+function getAdvancedGenerationPrompt(productInfo, knowledgeBase, style, targetAudience, hotPosts = null) {
+  const styleGuide = getStyleGuide(style);
+  const wordVariations = JSON.stringify(antiAigcStrategies.WORD_VARIATIONS, null, 0);
+  const colloquialFillers = JSON.stringify(antiAigcStrategies.COLLOQUIAL_FILLERS, null, 0);
+  const aiBlacklist = antiAigcStrategies.AI_TEMPLATE_BLACKLIST.join('、');
+
+  // v2.3: 如果有热门笔记，添加风格学习部分
+  let hotPostsSection = '';
+  if (hotPosts && hotPosts.length > 0) {
+    const hotPostsExamples = hotPosts.slice(0, 5).map((post, index) => {
+      return `**示例${index + 1}：**
+标题：${post.title}
+点赞数：${post.likes}
+内容片段：${post.content ? post.content.substring(0, 200) : '无'}...
+`;
+    }).join('\n');
+
+    hotPostsSection = `
+
+**【v2.3 热门笔记风格学习】**
+以下是当前热门的${hotPosts.length}篇笔记，请学习它们的：
+- 标题风格和用词习惯
+- 开头方式和叙事节奏
+- Emoji使用频率和位置
+- 段落结构和排版风格
+- 互动性语言和提问方式
+
+${hotPostsExamples}
+
+**重要提示：**
+- 学习它们的"风格"和"感觉"，而不是复制内容
+- 保持你自己的创作个性，只是让文风更贴近当前热门趋势
+- 如果热门笔记的风格与产品不符，以产品真实性为优先
+`;
+  }
+
+  return `你是一位拥有百万粉丝、精通小红书增长 Playbook 的资深博主。你深刻理解小红书的"中心化分发"漏斗算法。
+
+**你的核心任务：**
+基于用户提供的真实原始素材，创作一篇能在"初始流量池"就脱颖而出的爆款笔记。
+
+**【极其重要的指令】**
+你正在直接与最终用户对话，不要输出任何分析过程、思考过程或解释。用户只想看到最终的创作成果。
+
+**产品信息：**
+${JSON.stringify(productInfo, null, 2)}
+
+**参考知识库：**
+${knowledgeBase ? knowledgeBase.substring(0, 10000) : '无'}
+${hotPostsSection}
+**风格指南：**
+- 描述：${styleGuide.desc}
+- 语气：${styleGuide.tone}
+- 结构：${styleGuide.structure}
+- 关键词：${styleGuide.keywords.join('、')}
+
+**目标受众：** ${targetAudience}
+
+**1. 你的"人设"与"文风"核心指南 (必须严格遵守):**
+- **你的身份:** 你不是机器，你是一个正在兴奋地和闺蜜分享好东西的朋友。
+- **告别AI味:** 你的字典里没有"${aiBlacklist}"。拒绝书面语和复杂的长句。
+- **注入真情实感:** 使用生活化的感叹，分享真实心路历程，多用短句和细节描述。
+- **善用Emoji:** 自然地用emoji表达情绪，像真人聊天一样。
+  - **正文使用规范：** 每段使用1-2个相关emoji，避免过度使用
+  - **标题使用规范：** 单条标题最多1个emoji
+  - **优先选择：** 与内容相关的emoji（如✨💕🔥👍等）
+
+- **拒绝流水账:**
+  - 不要机械地罗列步骤或清单，而是通过故事化叙述串联内容
+  - 用"场景代入"替代"步骤说明"（如："早上7点闹钟响了，我迷迷糊糊..."而非"第一步：早起"）
+  - 多用转折和悬念（"本来以为会很麻烦，结果..."）
+  - 加入个人小情绪和吐槽（"说实话刚开始我也觉得这个有点贵..."）
+
+- **生活化细节:**
+  - 必须包含至少3个生活化细节（如具体时间、地点、天气、心情等）
+  - 用对话和内心独白增加真实感（"我妈看到后说：'这个真的有用吗？'"）
+  - 描述使用过程中的小插曲或意外收获
+
+- **降低 AIGC 检测率核心策略（v2.2 深度升级 - 目标 <10%）：**
+
+  **【动词短语扩展】**
+  - 将简洁动词扩展为带过程描述的短语，增加自然度
+  - 示例："用" → "开始用"、"去用"、"试着用"、"用起来"
+  - 示例："买" → "入手了"、"拿下了"、"剁手买了"
+  - 禁止总是使用最简洁的动词，要适当扩展
+
+  **【口语化辅助词注入】**
+  - 适当增加口语化辅助词，使句子更生动自然
+  - 参考：${colloquialFillers}
+  - 示例："效果好" → "效果真的好" 或 "效果居然这么好"
+
+  **【词汇多样性】**
+  - 同一概念在全文中必须使用不同表达，严格禁止重复
+  - 参考完整词汇替换库：${wordVariations}
+  - 示例："很好"在文中第1次用"不错"，第2次用"可以"，第3次用"还挺棒"
+
+  **【句式随机化】**
+  - 句式类型必须混合：陈述句、疑问句、感叹句、祈使句
+  - 禁止连续使用相同句式结构
+  - 使用"把"字句、倒装句、省略句
+
+  **【自然的不完美性】**
+  - 允许口语化停顿："就是...那种感觉"
+  - 允许自我修正："一开始觉得贵，但后来发现...其实还好"
+  - 允许重复强调："真的真的很推荐"
+
+  **【字数精准控制】**
+  - 正文字数严格控制在 450-750 字之间
+  - **重要**：不要为了凑字数而啰嗦，保持信息密度
+  - 每句话都要有实际信息量，不要空洞的感叹
+
+**2. 流量最大化创作准则:**
+- **价值二元论:** 这篇笔记主要提供"实用价值"还是"情绪价值"？尝试将两者结合。
+- **SEO即生存:** 关键词不仅是为了搜索，更是为了让算法找到最精准的受众。**首段首句必须自然包含主关键词**。
+- **生活化叙事法则:**
+  - 必须包含"时间+地点+人物+事件"的完整故事线
+  - 每个产品/方法都要配一个使用场景
+  - 加入至少2个生活小细节
+  - 使用"画面感"描述替代抽象形容
+- **趣味性注入:**
+  - 每篇内容至少包含1个幽默元素
+  - 用类比让枯燥内容变有趣
+  - 制造"小惊喜"
+- **内容为王:** 正文力求信息量丰富，朝600字努力，用短句、分段和表情符号优化排版。
+
+**3. 排版与美学指南 + 反结构化策略:**
+- **反结构化策略（降低 AI 痕迹的关键）：**
+  - **开头多样化：** 不要每次都是"姐妹们"、"宝子们"开头
+  - **段落长度随机化：** 有的段落1行，有的段落7-8行
+  - **Emoji 使用随机化：** 有的段落没有 emoji，有的段落连续3-4个
+- **呼吸感分段:** 拒绝"文字墙"！正文必须拆分成多个小段落，但长度要不规则。
+- **节奏感与变化:** 刻意混合使用长短句。
+
+**4. 内容安全准则:**
+- 禁用绝对化词语、医疗术语，避免夸大宣传。
+- 确保内容积极、健康、符合主流价值观。
+
+**输出格式（严格JSON）：**
+\`\`\`json
+{
+  "title": "标题文本（20字以内，emoji算2字）",
+  "content": "正文内容（450-750字）",
+  "tags": ["标签1", "标签2", "标签3"]
+}
+\`\`\`
+
+**自检-纠错闭环（输出前必须检查）：**
+1. **标题合规检查：** 每个标题≤20字（emoji计2字）
+2. **正文合规检查：** 字数在450-750字之间，包含≥3个生活化细节，包含≥1个幽默元素
+3. **标签合规检查：** 标签数量在10-15个之间
+4. **反 AIGC 检测自查：**
+   - [ ] 词汇多样性：同一概念是否使用了至少3种不同表达？
+   - [ ] 句式随机性：是否混合使用了疑问句、感叹句、倒装句、省略句？
+   - [ ] 不完美特征：是否包含停顿、修正、重复？
+   - [ ] 黑名单规避：是否完全避免了"${aiBlacklist}"等词？
+   - [ ] 字数精准：是否避免了为凑字数而啰嗦？
+
+请直接输出JSON，不要有任何额外说明。`;
+}
+
+/**
+ * 生成热门笔记分析Prompt（分析专家）
+ * 用于提取爆款公式、内容结构、标签策略等
+ *
+ * @param {string} hotPostsData - 热门笔记数据（文本格式）
+ * @returns {string} 分析Prompt
+ */
+function getAnalysisPrompt(hotPostsData) {
+  const safeContent = escapePromptContent(hotPostsData);
+
+  return `你是一位顶尖的小红书内容策略分析师，精通爆款笔记的所有构成要素。你的任务是基于以下热门笔记数据，进行深度拆解，并以严格的JSON格式输出一份可直接套用的《爆款公式报告》。
+
+**待分析的热门笔记数据:**
+>>> 原始内容开始 >>>
+${safeContent}
+<<< 原始内容结束 <<<
+
+**请严格按照以下JSON结构，输出你的分析报告。不要有任何多余的解释。**
+
+**真实性边界规则：**
+- 仅基于文本中可证的信息进行分析，不可推断的内容请返回空值
+- 禁止推测或虚构任何数据、品牌、价格或场景
+- 遇到不确定的信息，请返回""、[]、{}或null，不要编造
+- 绝对化词汇（最、第一、史上等）统一规避，不纳入分析结果
+
+**JSON输出须满足RFC8259标准，禁止出现多余逗号、注释或Markdown代码块包裹。直接输出纯净的JSON对象。**
+
+{
+  "titleFormulas": {
+    "analysis": "分析这些标题最常用的模式。例如：'提问式'、'共鸣式'、'数据型'、'清单式'等。注意：所有公式都必须确保生成的标题控制在20字以内。",
+    "suggestedFormulas": ${JSON.stringify(TITLE_FORMULAS_EXAMPLES)},
+    "commonKeywords": [],
+    "avoidWords": []
+  },
+  "contentStructure": {
+    "openingHooks": ${JSON.stringify(CONTENT_STRUCTURE_EXAMPLES.openingHooks)},
+    "storyTemplates": ${JSON.stringify(CONTENT_STRUCTURE_EXAMPLES.storyTemplates)},
+    "bodyTemplate": "总结正文最常见的内容组织模板。例如：'痛点描述 -> 引入产品/方案 -> 细节展示（材质、用法、对比）-> 个人真实感受 -> 使用建议'。",
+    "endingHooks": ${JSON.stringify(CONTENT_STRUCTURE_EXAMPLES.endingHooks)},
+    "emotionalTone": "分析这些笔记的情感基调，例如：'真诚分享'、'兴奋推荐'、'贴心提醒'等。"
+  },
+  "tagStrategy": {
+    "strategy": "分析标签组合策略。例如：'核心词+长尾词+场景词+人群标签的组合'。",
+    "commonTags": [],
+    "tagCategories": {
+      "coreKeywords": [],
+      "longTailKeywords": [],
+      "sceneTags": [],
+      "demographicTags": []
+    }
+  },
+  "coverStyleAnalysis": {
+    "commonStyles": ${JSON.stringify(COVER_STYLES_EXAMPLES)},
+    "suggestion": "根据笔记内容，从以上常见高点击率封面类型中，建议一种最适合的风格，并说明理由。",
+    "colorTone": "分析主流封面的色调偏好，例如：'温暖色调'、'清新色调'、'高对比度'等。"
+  },
+  "engagingWritingElements": ${JSON.stringify(ENGAGING_WRITING_ELEMENTS)},
+  "writingGuidelines": {
+    "antiListingRules": [
+      "禁止机械罗列步骤，必须用故事线串联",
+      "用场景代入替代步骤说明",
+      "每段都要有情绪起伏或转折",
+      "包含生活化细节和幽默元素"
+    ],
+    "lifelikeDetails": [
+      "具体时间、地点、天气、心情",
+      "对话和内心独白",
+      "使用过程中的小插曲",
+      "意外收获和惊喜发现"
+    ]
+  },
+  "engagementPatterns": {
+    "interactionTriggers": [],
+    "commentPatterns": [],
+    "shareReasons": []
+  }
+}
+
+**重要输出要求：**
+- 只返回JSON格式的内容，不要添加任何解释或其他文本
+- 输出须为合法JSON（UTF-8编码，无注释、无Markdown包裹、无多余逗号）
+- 禁止在JSON外包裹 \\\`\\\`\\\`json 代码块标记
+- 确保所有字符串值都用双引号包裹，避免JSON解析错误
+- 空值约定：字符串缺失返回""，数组缺失返回[]，对象缺失返回{}，无法判定返回null
+- 禁止编造信息或输出"示例"文字，不确定的信息请返回空值
+`;
+}
+
+export {
+  // 常量导出
+  STYLE_GUIDES,
+  TITLE_FORMULAS_EXAMPLES,
+  CONTENT_STRUCTURE_EXAMPLES,
+  COVER_STYLES_EXAMPLES,
+  ENGAGING_WRITING_ELEMENTS,
+  // 函数导出
+  getStyleGuide,
+  getAvailableStyles,
+  escapePromptContent,
+  getBasicGenerationPrompt,
+  getAdvancedGenerationPrompt,
+  getAnalysisPrompt
+};

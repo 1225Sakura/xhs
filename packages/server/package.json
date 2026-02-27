@@ -2,12 +2,13 @@
   "name": "@xhs-publisher/server",
   "version": "2.0.0",
   "description": "云端后端服务",
-  "main": "dist/server.js",
-  "type": "module",
+  "main": "src/server.js",
+  "type": "commonjs",
   "scripts": {
-    "dev": "node --watch src/server.js",
-    "start": "node dist/server.js",
-    "build": "echo 'Build server'"
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "build": "echo 'Build server'",
+    "migrate": "node src/scripts/migrate-database.js"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -18,6 +19,21 @@
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "multer": "^1.4.5-lts.1",
+    "axios": "^1.6.0",
+    "sqlite3": "^5.1.6",
+    "@anthropic-ai/sdk": "^0.30.1",
+    "better-sqlite3": "^9.2.2",
+    "csv-writer": "^1.6.0",
+    "https-proxy-agent": "^7.0.6",
+    "mammoth": "^1.6.0",
+    "node-cache": "^5.1.2",
+    "pdf-parse": "^1.1.1",
+    "playwright": "^1.58.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
   }
 }
