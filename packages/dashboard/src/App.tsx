@@ -4,6 +4,9 @@ import MainLayout from './layouts/MainLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
+import Licenses from './pages/Licenses';
+import Users from './pages/Users';
+import Metrics from './pages/Metrics';
 import { authService } from './services/auth';
 
 // 受保护的路由组件
@@ -31,9 +34,9 @@ const App: React.FC = () => {
       >
         <Route index element={<Dashboard />} />
         <Route path="clients" element={<Clients />} />
-        <Route path="licenses" element={<div>许可证管理（开发中）</div>} />
-        <Route path="users" element={<div>用户管理（开发中）</div>} />
-        <Route path="metrics" element={<div>指标监控（开发中）</div>} />
+        <Route path="licenses" element={<Licenses />} />
+        <Route path="users" element={<Users />} />
+        <Route path="metrics" element={<Metrics />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
