@@ -168,7 +168,7 @@ try {
   API文档: http://localhost:${PORT}/api/health
 
   环境变量:
-  - ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? '已配置' : '未配置'}
+  - DEEPSEEK_API_KEY: ${process.env.DEEPSEEK_API_KEY ? '已配置' : '未配置'}
   - KNOWLEDGE_BASE_PATH: ${process.env.KNOWLEDGE_BASE_PATH || '未配置'}
   - XIAOHONGSHU_MCP_PATH: ${process.env.XIAOHONGSHU_MCP_PATH || '未配置'}
 

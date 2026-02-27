@@ -60,7 +60,7 @@ class ProviderRegistry {
 
   /**
    * 根据provider名称获取配置
-   * @param {string} provider - 提供商标识（如 'openai', 'anthropic'）
+   * @param {string} provider - 提供商标识（如 'deepseek'）
    * @returns {Object|null} 提供商配置
    */
   getProvider(provider) {

@@ -270,12 +270,7 @@ try {
   console.log('⏳ 插入默认AI提供商配置...');
 
   const defaultProviders = [
-    { provider: 'anthropic', name: 'Anthropic Claude', priority: 100, url: 'https://api.anthropic.com' },
-    { provider: 'openai', name: 'OpenAI', priority: 90, url: 'https://api.openai.com/v1' },
-    { provider: 'qwen', name: '通义千问', priority: 80, url: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
-    { provider: 'kimi', name: 'Moonshot Kimi', priority: 70, url: 'https://api.moonshot.cn/v1' },
-    { provider: 'doubao', name: '字节豆包', priority: 60, url: 'https://ark.cn-beijing.volces.com/api/v3' },
-    { provider: 'gemini', name: 'Google Gemini', priority: 50, url: 'https://generativelanguage.googleapis.com/v1beta' }
+    { provider: 'deepseek', name: 'DeepSeek', priority: 100, url: 'https://api.deepseek.com' }
   ];
 
   const insertProvider = db.prepare(`
@@ -287,10 +282,10 @@ try {
     insertProvider.run(p.provider, p.name, p.priority, p.url, 0); // 默认禁用，需要配置API key
   }
 
-  // 如果环境变量中有ANTHROPIC_API_KEY，自动启用Anthropic
-  if (process.env.ANTHROPIC_API_KEY) {
-    db.prepare(`UPDATE ai_providers SET is_enabled = 1 WHERE provider = 'anthropic'`).run();
-    console.log('✅ 检测到ANTHROPIC_API_KEY，已启用Anthropic提供商');
+  // 如果环境变量中有DEEPSEEK_API_KEY，自动启用DeepSeek
+  if (process.env.DEEPSEEK_API_KEY) {
+    db.prepare(`UPDATE ai_providers SET is_enabled = 1 WHERE provider = 'deepseek'`).run();
+    console.log('✅ 检测到DEEPSEEK_API_KEY，已启用DeepSeek提供商');
   }
 
   console.log('✅ 默认AI提供商配置插入完成');

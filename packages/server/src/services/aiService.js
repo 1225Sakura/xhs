@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import logger from '../utils/logger.js';
 import axios from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
@@ -288,11 +287,11 @@ export async function callAIAPIWithFallback(model, messages, maxTokens = 2048, o
  * @deprecated 建议使用 callAIAPIWithFallback
  */
 async function callAIAPI(model, messages, maxTokens = 2048) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  const baseURL = process.env.ANTHROPIC_BASE_URL;
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const baseURL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
 
   if (!apiKey) {
-    throw new Error('未配置API Key');
+    throw new Error('未配置DeepSeek API Key');
   }
 
   const modelConfig = AI_MODELS[model];
@@ -300,52 +299,29 @@ async function callAIAPI(model, messages, maxTokens = 2048) {
     throw new Error(`不支持的模型: ${model}`);
   }
 
-  if (baseURL) {
-    const isAnthropic = modelConfig.provider === 'anthropic';
-    const endpoint = isAnthropic ? '/v1/messages' : '/v1/chat/completions';
-    const url = `${baseURL.replace(/\/$/, '')}${endpoint}`;
+  const url = `${baseURL.replace(/\/$/, '')}/v1/chat/completions`;
+  const requestBody = { model, max_tokens: maxTokens, messages, temperature: 0.7 };
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${apiKey}`,
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+  };
 
-    let requestBody, headers;
+  const response = await axios.post(url, requestBody, {
+    ...getAxiosConfig(),
+    headers,
+    timeout: 60000,
+    maxRedirects: 5
+  });
 
-    if (isAnthropic) {
-      requestBody = { model, max_tokens: maxTokens, messages };
-      headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'anthropic-version': '2023-06-01',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      };
-    } else {
-      requestBody = { model, max_tokens: maxTokens, messages, temperature: 0.7 };
-      headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      };
-    }
-
-    const response = await axios.post(url, requestBody, {
-      ...getAxiosConfig(),
-      headers,
-      timeout: 60000,
-      maxRedirects: 5
-    });
-
-    if (isAnthropic) {
-      return response.data;
-    } else {
-      const choice = response.data.choices?.[0];
-      if (!choice) {
-        throw new Error('API返回数据格式错误');
-      }
-      return {
-        content: [{ type: 'text', text: choice.message?.content || choice.text || '' }]
-      };
-    }
+  const choice = response.data.choices?.[0];
+  if (!choice) {
+    throw new Error('API返回数据格式错误');
   }
 
-  const client = new Anthropic({ apiKey });
-  return await client.messages.create({ model, max_tokens: maxTokens, messages });
+  return {
+    content: [{ type: 'text', text: choice.message?.content || choice.text || '' }]
+  };
 }
 
 /**
@@ -588,7 +564,7 @@ ${knowledgeBase || '无额外参考'}
 /**
  * 优化现有文案
  */
-export async function optimizeContent(content, requirements, model = 'claude-sonnet-4-5-20250929', post_id = null) {
+export async function optimizeContent(content, requirements, model = 'deepseek-chat', post_id = null) {
   const prompt = `请优化以下小红书文案：
 
 原文案：
