@@ -2,6 +2,7 @@
   "name": "xhs-knowledge-publisher",
   "version": "2.0.0",
   "description": "私有知识库管理和小红书文案发布系统 - Monorepo架构",
+  "type": "module",
   "private": true,
   "workspaces": [
     "packages/*"
