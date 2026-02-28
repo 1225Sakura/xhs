@@ -501,6 +501,50 @@ export function initDatabase() {
     console.log('✅ 默认AI提供商配置已插入');
   }
 
+  // ==================== 云端API表 ====================
+
+  // 用户表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      email TEXT,
+      role TEXT DEFAULT 'user',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_login DATETIME
+    )
+  `);
+
+  // 客户端表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS clients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id TEXT NOT NULL UNIQUE,
+      hostname TEXT NOT NULL,
+      platform TEXT,
+      version TEXT,
+      status TEXT DEFAULT 'offline',
+      registered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_seen DATETIME
+    )
+  `);
+
+  // 客户端指标表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS client_metrics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id TEXT NOT NULL,
+      cpu_usage REAL,
+      memory_usage REAL,
+      disk_usage REAL,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (client_id) REFERENCES clients(client_id) ON DELETE CASCADE
+    )
+  `);
+
+  console.log('✅ 云端API表初始化完成');
+
   console.log('✅ 数据库初始化完成');
 }
 
