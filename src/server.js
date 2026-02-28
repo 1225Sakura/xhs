@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initDatabase } from './models/database.js';
 import router from './routes/index.js';
+import cloudRoutes from './routes/cloudRoutes.js';
 import schedulerService from './services/schedulerService.js';
 import logger from './utils/logger.js';
 
@@ -34,6 +35,9 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // API路由
 app.use('/api', router);
+
+// 云端API路由
+app.use('/api/cloud', cloudRoutes);
 
 // API 信息路由
 app.get('/api', (req, res) => {
