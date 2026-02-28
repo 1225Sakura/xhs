@@ -1,6 +1,10 @@
 import express from 'express';
 import userController from '../controllers/userController.js';
 import clientController from '../controllers/clientController.js';
+import licenseController from '../controllers/licenseController.js';
+import configController from '../controllers/configController.js';
+import syncController from '../controllers/syncController.js';
+import metricsController from '../controllers/metricsController.js';
 import { authenticate, requireRole, authenticateClient } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -13,13 +17,21 @@ const router = express.Router();
 router.post('/auth/login', userController.login.bind(userController));
 router.post('/auth/register', userController.register.bind(userController));
 
+// 许可证验证
+router.post('/license/verify', licenseController.verify.bind(licenseController));
+router.get('/license/public-key', licenseController.getPublicKeyEndpoint.bind(licenseController));
+
+// Prometheus指标导出（无需认证，供Prometheus抓取）
+router.get('/metrics', metricsController.exportMetrics.bind(metricsController));
+
 // 健康检查
 router.get('/health', (req, res) => {
   res.json({
     success: true,
     message: '云端API服务运行正常',
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '2.0.0',
+    features: ['auth', 'clients', 'licenses', 'config', 'sync', 'metrics']
   });
 });
 
@@ -35,6 +47,25 @@ router.post('/clients/register', (req, res) => {
 // 客户端心跳
 router.post('/clients/heartbeat', authenticateClient, (req, res) => {
   clientController.heartbeat(req, res);
+});
+
+// 配置同步
+router.get('/config/:clientId', authenticateClient, (req, res) => {
+  configController.getConfig(req, res);
+});
+
+// 数据同步
+router.post('/sync/upload', authenticateClient, (req, res) => {
+  syncController.upload(req, res);
+});
+
+router.get('/sync/download/:clientId', authenticateClient, (req, res) => {
+  syncController.download(req, res);
+});
+
+// 指标上传
+router.post('/metrics/upload', authenticateClient, (req, res) => {
+  syncController.uploadMetrics(req, res);
 });
 
 // ============================================
@@ -85,83 +116,31 @@ router.get('/audit-logs', authenticate, requireRole('admin'), (req, res) => {
   userController.getAuditLogs(req, res);
 });
 
-// ============================================
-// 占位路由（待实现功能）
-// ============================================
-
-// 许可证管理（待实现）
-router.post('/license/verify', (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: '许可证验证功能待实现'
-  });
+// 许可证管理
+router.post('/license', authenticate, requireRole('admin'), (req, res) => {
+  licenseController.create(req, res);
 });
 
-router.get('/license/public-key', (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: '许可证公钥获取功能待实现'
-  });
+router.get('/license/:licenseKey', authenticate, requireRole('admin'), (req, res) => {
+  licenseController.get(req, res);
 });
 
-// 配置同步（待实现）
-router.get('/config/:clientId', authenticateClient, (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: '配置同步功能待实现'
-  });
+router.put('/license/:licenseKey', authenticate, requireRole('admin'), (req, res) => {
+  licenseController.update(req, res);
 });
 
+// 配置管理
 router.put('/config/:clientId', authenticate, requireRole('admin'), (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: '配置更新功能待实现'
-  });
+  configController.updateConfig(req, res);
 });
 
-// 数据同步（待实现）
-router.post('/sync/upload', authenticateClient, (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: '数据上传功能待实现'
-  });
-});
-
-router.get('/sync/download/:clientId', authenticateClient, (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: '数据下载功能待实现'
-  });
-});
-
-// 指标收集（待实现）
-router.post('/metrics/upload', authenticateClient, (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: '指标上传功能待实现'
-  });
-});
-
+// 指标查询
 router.get('/metrics/client/:clientId', authenticate, requireRole('admin'), (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: '客户端指标查询功能待实现'
-  });
+  syncController.getMetrics(req, res);
 });
 
 router.get('/metrics/summary', authenticate, requireRole('admin'), (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: '指标汇总功能待实现'
-  });
-});
-
-// Prometheus指标导出（待实现）
-router.get('/metrics', (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: 'Prometheus指标导出功能待实现'
-  });
+  metricsController.getMetricsSummary(req, res);
 });
 
 export default router;

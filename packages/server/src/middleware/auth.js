@@ -1,18 +1,18 @@
-const jwt = require('jsonwebtoken');
-const logger = require('../utils/logger');
+import jwt from 'jsonwebtoken';
+import logger from '../utils/logger.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // 生成JWT token
-function generateToken(payload) {
+export function generateToken(payload) {
   return jwt.sign(payload, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN
   });
 }
 
 // 验证JWT token
-function verifyToken(token) {
+export function verifyToken(token) {
   try {
     return jwt.verify(token, JWT_SECRET);
   } catch (error) {
@@ -22,7 +22,7 @@ function verifyToken(token) {
 }
 
 // JWT认证中间件
-function authenticate(req, res, next) {
+export function authenticate(req, res, next) {
   try {
     // 从请求头获取token
     const authHeader = req.headers.authorization;
@@ -78,7 +78,7 @@ function authenticate(req, res, next) {
 }
 
 // 可选认证中间件（token可选）
-function optionalAuthenticate(req, res, next) {
+export function optionalAuthenticate(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
 
@@ -101,7 +101,7 @@ function optionalAuthenticate(req, res, next) {
 }
 
 // 角色检查中间件
-function requireRole(...roles) {
+export function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
@@ -128,7 +128,7 @@ function requireRole(...roles) {
 }
 
 // 客户端认证中间件（用于客户端API）
-function authenticateClient(req, res, next) {
+export function authenticateClient(req, res, next) {
   try {
     const clientId = req.body.clientId || req.params.clientId || req.query.clientId;
 
@@ -188,12 +188,3 @@ function authenticateClient(req, res, next) {
     });
   }
 }
-
-module.exports = {
-  generateToken,
-  verifyToken,
-  authenticate,
-  optionalAuthenticate,
-  requireRole,
-  authenticateClient
-};

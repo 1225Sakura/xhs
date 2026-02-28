@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import accountRoutes from './accountRoutes.js';
+import cloudRoutes from './cloudRoutes.js';
 import {
   getAllDocs,
   getDocById,
@@ -239,5 +240,8 @@ import xhsLoginController from '../controllers/xhsLoginController.js';
 // 获取登录二维码
 // 账户管理路由
 router.use(accountRoutes);
+
+// 云端API路由
+router.use('/cloud', cloudRoutes);
 
 export default router;

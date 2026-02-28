@@ -1,12 +1,13 @@
-const express = require('express');
+import express from 'express';
+import * as clientController from '../controllers/clientController.js';
+import * as configController from '../controllers/configController.js';
+import * as syncController from '../controllers/syncController.js';
+import * as licenseController from '../controllers/licenseController.js';
+import * as userController from '../controllers/userController.js';
+import * as metricsController from '../controllers/metricsController.js';
+import { authenticate, requireRole, authenticateClient } from '../middleware/auth.js';
+
 const router = express.Router();
-const clientController = require('../controllers/cloudClientController');
-const configController = require('../controllers/cloudConfigController');
-const syncController = require('../controllers/cloudSyncController');
-const licenseController = require('../controllers/licenseController');
-const userController = require('../controllers/userController');
-const metricsController = require('../controllers/metricsController');
-const { authenticate, requireRole, authenticateClient } = require('../middleware/auth');
 
 // 公开路由（无需认证）
 router.post('/auth/login', userController.login);
@@ -48,4 +49,4 @@ router.put('/users/:userId', authenticate, requireRole('admin'), userController.
 router.delete('/users/:userId', authenticate, requireRole('admin'), userController.delete);
 router.get('/audit-logs', authenticate, requireRole('admin'), userController.getAuditLogs);
 
-module.exports = router;
+export default router;

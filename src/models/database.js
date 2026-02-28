@@ -543,6 +543,48 @@ export function initDatabase() {
     )
   `);
 
+  // 许可证表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS licenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      license_key TEXT NOT NULL UNIQUE,
+      client_id TEXT NOT NULL,
+      type TEXT DEFAULT 'standard',
+      max_clients INTEGER DEFAULT 1,
+      features TEXT,
+      issued_at DATETIME NOT NULL,
+      expires_at DATETIME,
+      signature TEXT NOT NULL,
+      status TEXT DEFAULT 'active',
+      last_verified DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 配置表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS client_configs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id TEXT NOT NULL,
+      config_key TEXT NOT NULL,
+      config_value TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(client_id, config_key)
+    )
+  `);
+
+  // 数据同步表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sync_data (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id TEXT NOT NULL,
+      data_type TEXT NOT NULL,
+      data_content TEXT,
+      version INTEGER DEFAULT 1,
+      uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   console.log('✅ 云端API表初始化完成');
 
   console.log('✅ 数据库初始化完成');
